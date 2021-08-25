@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="a46e955f-f7d0-4d45-b668-59dcc0f3b911" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_camera/yolov3_mvtransd53v2_544_25e_db4_ABCD_c4_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_camera/yolov3_mvtransd53v2_544_25e_db4_ABCD_c5_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_camera/yolov3_mvtransd53v2_544_25e_db4_ABCD_sv.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_camera/yolov3_mvtransd53v2_544_25e_db4_AC_c4_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_camera/yolov3_mvtransd53v2_544_25e_db4_AC_c5_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_camera/yolov3_mvtransd53v2_544_25e_db4_AC_sv.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_firearm/yolov3_mvtransd53v2_544_25e_db4_ABCD_c4_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_firearm/yolov3_mvtransd53v2_544_25e_db4_ABCD_c5_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_firearm/yolov3_mvtransd53v2_544_25e_db4_ABCD_sv.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_firearm/yolov3_mvtransd53v2_544_25e_db4_AC_c4_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_firearm/yolov3_mvtransd53v2_544_25e_db4_AC_c5_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_firearm/yolov3_mvtransd53v2_544_25e_db4_AC_sv.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_knife/yolov3_mvtransd53v2_544_25e_db4_ABCD_c4_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_knife/yolov3_mvtransd53v2_544_25e_db4_ABCD_c5_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_knife/yolov3_mvtransd53v2_544_25e_db4_ABCD_sv.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_knife/yolov3_mvtransd53v2_544_25e_db4_AC_c4_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_knife/yolov3_mvtransd53v2_544_25e_db4_AC_c5_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../xray_mv_db4_knife/yolov3_mvtransd53v2_544_25e_db4_AC_sv.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/yolov3_mvtransd53v2_544_25e_db4_ABCD_c4_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/yolov3_mvtransd53v2_544_25e_db4_ABCD_c5_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/yolov3_mvtransd53v2_544_25e_db4_ABCD_sv.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/yolov3_mvtransd53v2_544_25e_db4_AC_c4_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/yolov3_mvtransd53v2_544_25e_db4_AC_c5_e1d1_nb2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/yolov3_mvtransd53v2_544_25e_db4_AC_sv.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../../.." />
+  </component>
+  <component name="JupyterTrust" id="ff0f78cb-0baa-493a-bee6-74a6187e8156" />
+  <component name="ProjectId" id="1sPVvf9zhcmIqVESnmpflapC5JQ" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../../../mmclassification" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+    <property name="settings.editor.selected.configurable" value="aws" />
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="a46e955f-f7d0-4d45-b668-59dcc0f3b911" name="Default Changelist" comment="" />
+      <created>1620774459450</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1620774459450</updated>
+      <workItem from="1620774460469" duration="611000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="2663" y="277" width="424" height="491" key="FileChooserDialogImpl" timestamp="1620775172474">
+      <screen x="1920" y="0" width="1920" height="1080" />
+    </state>
+    <state x="2663" y="277" width="424" height="491" key="FileChooserDialogImpl/1920.0.1920.1080/0.27.1920.985@1920.0.1920.1080" timestamp="1620775172474" />
+  </component>
+</project>
