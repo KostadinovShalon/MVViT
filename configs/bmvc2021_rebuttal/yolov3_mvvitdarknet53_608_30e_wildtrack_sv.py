@@ -10,7 +10,7 @@ custom_imports = dict(imports=['MVViT.models.backbones.mvvit_darknet',
                                'MVViT.datasets.coco_mv',
                                'MVViT.datasets.custom_mv'], allow_failed_imports=False)
 
-size = (544, 544)
+size = (320, 320)
 classes = ('person',)
 model = dict(
     backbone=dict(type='MVViTDarknet',

@@ -42,27 +42,29 @@ class YOLOV3MVHead(YOLOV3Head):
         result_list = []
         num_levels = len(pred_maps)
         views = len(pred_maps[0])
-        for img_id in range(len(img_metas)):
-            for v in range(views):
-                pred_maps_list = [
-                    pred_maps[i][img_id * views + v].detach() for i in range(num_levels)
-                ]
-                scale_factor = img_metas[img_id]['scale_factor'][v]
-                proposals = self._get_bboxes_single(pred_maps_list, scale_factor,
-                                                    cfg, rescale, with_nms)
-                if rescale and 'pad_to_centre' in img_metas[img_id].keys():
-                    if img_metas[img_id]['pad_to_centre']:
-                        ori_shape = img_metas[img_id]['ori_shape'][v]
-                        h, w, _ = ori_shape
-                        delta_x = max(0, h - w) // 2
-                        delta_y = max(0, w - h) // 2
-                        remove_padding = torch.tensor([[-delta_x, -delta_y, -delta_x, -delta_y, 0]])\
-                            .repeat_interleave(proposals[0].shape[0], dim=0).to(proposals[0].device)
-                        proposals = proposals[0] + remove_padding, proposals[1]
-                result_list.append(proposals)
+        for v in range(views):
+            pred_maps_list = [
+                pred_maps[i][v::views].detach() for i in range(num_levels)
+            ]
+            scale_factors = [
+                img_metas[i]['scale_factor'][v]
+                for i in range(pred_maps_list[0].shape[0])
+            ]
+            proposals = self._get_bboxes(pred_maps_list, scale_factors,
+                                         cfg, rescale, with_nms)
+            for img_id in range(len(img_metas)):
+                if rescale and 'pad_to_centre' in img_metas[img_id].keys() and img_metas[img_id]['pad_to_centre']:
+                    ori_shape = img_metas[img_id]['ori_shape'][v]
+                    h, w, _ = ori_shape
+                    delta_x = max(0, h - w) // 2
+                    delta_y = max(0, w - h) // 2
+                    remove_padding = torch.tensor([[-delta_x, -delta_y, -delta_x, -delta_y, 0]]) \
+                        .repeat_interleave(proposals[img_id][0].shape[0], dim=0).to(proposals[img_id][0].device)
+                    proposals[img_id] = proposals[img_id][0] + remove_padding, proposals[img_id][1]
+                result_list.append(proposals[img_id])
         return result_list
 
-    @force_fp32(apply_to=('pred_maps', ))
+    @force_fp32(apply_to=('pred_maps',))
     def loss(self,
              pred_maps,
              gt_bboxes,
