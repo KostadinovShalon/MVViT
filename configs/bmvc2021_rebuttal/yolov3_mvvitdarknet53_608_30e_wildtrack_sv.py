@@ -10,7 +10,7 @@ custom_imports = dict(imports=['MVViT.models.backbones.mvvit_darknet',
                                'MVViT.datasets.coco_mv',
                                'MVViT.datasets.custom_mv'], allow_failed_imports=False)
 
-size = (320, 320)
+size = (608, 608)
 classes = ('person',)
 model = dict(
     backbone=dict(type='MVViTDarknet',
@@ -56,8 +56,8 @@ test_pipeline = [
 ]
 # Modify dataset related settings
 data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=2,
+    samples_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         _delete_=True,
         type=dataset_type,
