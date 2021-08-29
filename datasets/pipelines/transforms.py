@@ -308,7 +308,7 @@ class MVPad(Pad):
     """
 
     def __init__(self, size=None, size_divisor=None, pad_val=0, pad_to_centre=False):
-        super().__init__(size, size_divisor, pad_val)
+        super().__init__(size, size_divisor, False, pad_val)
         self.pad_to_centre = pad_to_centre
 
     def _pad_img(self, results):
