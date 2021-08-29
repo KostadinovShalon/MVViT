@@ -11,7 +11,7 @@ from mmcv.runner import load_checkpoint, BaseModule
 from torch.nn import Parameter
 from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
 from torch.nn.modules.batchnorm import _BatchNorm
-from torch.nn.modules.linear import NonDynamicallyQuantizableLinear
+from torch.nn.modules.linear import Linear
 
 from mmdet.models.builder import BACKBONES
 
@@ -130,7 +130,7 @@ class MultiheadAttentionND(nn.Module):
             self.in_proj_bias = Parameter(torch.empty(3 * embed_dim))
         else:
             self.register_parameter('in_proj_bias', None)
-        self.out_proj = NonDynamicallyQuantizableLinear(embed_dim, embed_dim, bias=bias)
+        self.out_proj = Linear(embed_dim, embed_dim, bias=bias)
 
         if add_bias_kv:
             self.bias_k = Parameter(torch.empty(1, 1, embed_dim))
