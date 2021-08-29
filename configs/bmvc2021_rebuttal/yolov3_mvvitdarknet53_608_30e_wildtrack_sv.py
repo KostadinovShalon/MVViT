@@ -56,7 +56,7 @@ test_pipeline = [
 ]
 # Modify dataset related settings
 data = dict(
-    samples_per_gpu=1,
+    samples_per_gpu=2,
     workers_per_gpu=2,
     train=dict(
         _delete_=True,
