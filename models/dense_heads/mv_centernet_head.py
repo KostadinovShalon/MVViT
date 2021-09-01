@@ -113,5 +113,36 @@ class MVCenterNetHead(CenterNetHead):
         """
         gt_bboxes = [v_b_gt_bboxes for b_gt_bboxes in gt_bboxes for v_b_gt_bboxes in b_gt_bboxes]
         gt_labels = [v_b_gt_labels for b_gt_labels in gt_labels for v_b_gt_labels in b_gt_labels]
-        return super().loss(center_heatmap_preds, wh_preds, offset_preds, gt_bboxes, gt_labels, img_metas,
-                            gt_bboxes_ignore)
+        assert len(center_heatmap_preds) == len(wh_preds) == len(
+            offset_preds) == 1
+        center_heatmap_pred = center_heatmap_preds[0]
+        wh_pred = wh_preds[0]
+        offset_pred = offset_preds[0]
+
+        target_result, avg_factor = self.get_targets(gt_bboxes, gt_labels,
+                                                     center_heatmap_pred.shape,
+                                                     img_metas[0]['pad_shape'][0])
+
+        center_heatmap_target = target_result['center_heatmap_target']
+        wh_target = target_result['wh_target']
+        offset_target = target_result['offset_target']
+        wh_offset_target_weight = target_result['wh_offset_target_weight']
+
+        # Since the channel of wh_target and offset_target is 2, the avg_factor
+        # of loss_center_heatmap is always 1/2 of loss_wh and loss_offset.
+        loss_center_heatmap = self.loss_center_heatmap(
+            center_heatmap_pred, center_heatmap_target, avg_factor=avg_factor)
+        loss_wh = self.loss_wh(
+            wh_pred,
+            wh_target,
+            wh_offset_target_weight,
+            avg_factor=avg_factor * 2)
+        loss_offset = self.loss_offset(
+            offset_pred,
+            offset_target,
+            wh_offset_target_weight,
+            avg_factor=avg_factor * 2)
+        return dict(
+            loss_center_heatmap=loss_center_heatmap,
+            loss_wh=loss_wh,
+            loss_offset=loss_offset)
