@@ -21,7 +21,7 @@ model = dict(
         multiview_decoder_mode='cat'),
     bbox_head=dict(
         type='MVCenterNetHead',
-        num_classes=1))
+        num_classes=4))
 
 dataset_type = 'MVCocoDataset'
 checkpoint_config = dict(interval=1)
