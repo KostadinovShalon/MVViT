@@ -100,7 +100,7 @@ data = dict(
                    'data/Wildtrack/view6_val.json'],
         pipeline=test_pipeline))
 # optimizer
-# optimizer = dict(type='SGD', lr=0.0001, weight_decay=0.0001, _delete_=True)
+optimizer = dict(lr=0.005)
 evaluation = dict(interval=1, metric=['bbox'])
 
 load_from = 'checkpoints/centernet_resnet18_dcnv2_140e_coco_20210702_155131-c8cd631f.pth'
