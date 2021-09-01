@@ -3,6 +3,6 @@ model = dict(
     backbone=dict(
         combination_block=4,
         num_decoder_layers=1,
-        shared_transformer=False
+        shared_transformer=True
     )
 )
