@@ -103,4 +103,4 @@ data = dict(
 # optimizer = dict(type='SGD', lr=0.0001, weight_decay=0.0001, _delete_=True)
 evaluation = dict(interval=1, metric=['bbox'])
 
-load_from = 'checkpoints/yolov3_d53_mstrain-608_273e_coco_20210518_115020-a2c3acb8.pth'
+load_from = 'checkpoints/centernet_resnet18_dcnv2_140e_coco_20210702_155131-c8cd631f.pth'
