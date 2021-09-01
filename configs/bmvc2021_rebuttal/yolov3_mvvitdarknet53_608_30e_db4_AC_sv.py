@@ -6,6 +6,8 @@ model = dict(
 
 # Modify dataset related settings
 data = dict(
+    samples_per_gpu=8,
+    workers_per_gpu=4,
     train=dict(
         ann_files=['data/db4/db4_train_A.json', 'data/db4/db4_train_C.json']),
     val=dict(
