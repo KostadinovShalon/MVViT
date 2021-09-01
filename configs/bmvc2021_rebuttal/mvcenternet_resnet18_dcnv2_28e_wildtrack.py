@@ -33,6 +33,7 @@ train_pipeline = [
     dict(type='LoadMVAnnotations', with_bbox=True),
     dict(type='MVResize', img_scale=size, keep_ratio=True),
     dict(type='MVNormalize', **img_norm_cfg),
+    dict(type='MVPad', size=size),
     dict(type='MVFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels'], meta_keys=('filename', 'ori_filename', 'ori_shape',
                                                                             'img_shape', 'pad_shape',
@@ -48,6 +49,7 @@ test_pipeline = [
         transforms=[
             dict(type='MVResize', keep_ratio=True),
             dict(type='MVNormalize', **img_norm_cfg),
+            dict(type='MVPad', size=size),
             dict(type='MVImageToTensor', keys=['img']),
             dict(type='Collect', keys=['img'], meta_keys=('filename', 'ori_filename', 'ori_shape',
                                                           'img_shape', 'pad_shape',
@@ -98,7 +100,7 @@ data = dict(
                    'data/Wildtrack/view6_val.json'],
         pipeline=test_pipeline))
 # optimizer
-optimizer = dict(type='SGD', lr=0.0001, weight_decay=0.0001, _delete_=True)
+# optimizer = dict(type='SGD', lr=0.0001, weight_decay=0.0001, _delete_=True)
 evaluation = dict(interval=1, metric=['bbox'])
 
 load_from = 'checkpoints/yolov3_d53_mstrain-608_273e_coco_20210518_115020-a2c3acb8.pth'

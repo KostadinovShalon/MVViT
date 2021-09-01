@@ -28,22 +28,21 @@ class MVCTResNetNeck(CTResNetNeck):
                  multiview_decoder_mode='add',
                  single_view=False):
         super(MVCTResNetNeck, self).__init__(in_channel, num_deconv_filters, num_deconv_kernels, use_dcn, init_cfg)
-        fus_ft_dims = num_deconv_filters[-1]
-        self.positional_encoding = MultiViewPositionalEncoding(fus_ft_dims) if positional_encoding else nn.Identity()
+        self.positional_encoding = MultiViewPositionalEncoding(in_channel) if positional_encoding else nn.Identity()
         self.views = views
-        self.transformer = MVTransformer(fus_ft_dims, nhead, num_decoder_layers, n_views=views,
+        self.transformer = MVTransformer(in_channel, nhead, num_decoder_layers, n_views=views,
                                          mode=multiview_decoder_mode)
         self.single_view = single_view
 
     @auto_fp16()
     def forward(self, inputs, with_attn_weights=False):
         assert isinstance(inputs, (list, tuple))
-        last_layer_out = inputs[-1]
-        x, _ = self.mv_transformer(last_layer_out, with_attn_weights)
+        x = inputs[-1]
         if not self.single_view:
-            x = x.transpose(0, 1).contiguous()
-            x = torch.stack([self.deconv_layers(xv) for xv in x])
-            x = x.transpose(0, 1).contiguous()  # B V
+            x, _ = self.mv_transformer(x, with_attn_weights)
+        x = x.transpose(0, 1).contiguous()
+        x = torch.stack([self.deconv_layers(xv) for xv in x])
+        x = x.transpose(0, 1).contiguous()  # B V
         x = x.view(-1, *x.shape[2:])  # (b.v) x f x w' x h' ordered per view
         return x,
 

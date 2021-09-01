@@ -41,8 +41,8 @@ class MVCenterNetHead(CenterNetHead):
         """
         assert len(center_heatmap_preds) == len(wh_preds) == len(
             offset_preds) == 1
+        views = len(img_metas[0]['scale_factor'])
         scale_factors = [scale_factor for img_meta in img_metas for scale_factor in img_meta['scale_factor']]
-        border_pixs = [border for img_meta in img_metas for border in img_meta['border']]
 
         batch_det_bboxes, batch_labels = self.decode_heatmap(
             center_heatmap_preds[0],
@@ -52,10 +52,16 @@ class MVCenterNetHead(CenterNetHead):
             k=self.test_cfg.topk,
             kernel=self.test_cfg.local_maximum_kernel)
 
-        batch_border = batch_det_bboxes.new_tensor(
-            border_pixs)[:, [2, 0, 2, 0]].unsqueeze(1)
-        batch_det_bboxes[..., :4] -= batch_border
-
+        for img_id in range(len(img_metas)):
+            for view in range(views):
+                ori_shape = img_metas[img_id]['ori_shape'][view]
+                h, w, _ = ori_shape
+                if 'pad_to_centre' in img_metas[img_id].keys() and img_metas[img_id]['pad_to_centre']:
+                    delta_x = max(0, h - w) // 2
+                    delta_y = max(0, w - h) // 2
+                    border = batch_det_bboxes.tensor([[delta_x, delta_y, delta_x, delta_y]]) \
+                        .repeat_interleave(batch_det_bboxes[img_id * views + view].shape[0], dim=0)
+                    batch_det_bboxes[img_id * views + view] -= border
         if rescale:
             batch_det_bboxes[..., :4] /= batch_det_bboxes.new_tensor(
                 scale_factors).unsqueeze(1)
