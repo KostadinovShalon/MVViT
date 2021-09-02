@@ -12,7 +12,7 @@ class MVResNet(ResNet):
         for xv in x:
             mv_outs.append(super().forward(xv))
         outs = []
-        for i in self.out_indices:
+        for i, _ in enumerate(self.out_indices):
             single_layer_mv_out = [sv_outs[i] for sv_outs in mv_outs]
             single_layer_mv_out = torch.stack(single_layer_mv_out).transpose(0, 1)
             outs.append(single_layer_mv_out)
