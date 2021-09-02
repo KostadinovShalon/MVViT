@@ -1,5 +1,4 @@
-from mmcv.cnn import xavier_init
-from mmcv.cnn.bricks.transformer import build_transformer_layer_sequence
+import torch
 
 from mmdet.models.utils import Transformer
 from mmdet.models.utils.builder import TRANSFORMER
@@ -27,15 +26,18 @@ class MVTransformer(Transformer):
         init_cfg (obj:`mmcv.ConfigDict`): The Config for initialization.
             Defaults to None.
     """
+    def __init__(self, encoder=None, decoder=None, init_cfg=None, single_view=False):
+        super(MVTransformer, self).__init__(encoder, decoder, init_cfg)
+        self.single_view = single_view
 
     def forward(self, x, mask, query_embed, pos_embed):
         """Forward function for `Transformer`.
 
         Args:
-            x (Tensor): Input query with shape [bs, c, h, w] where
+            x (Tensor): Input query with shape [bs, v, c, h, w] where
                 c = embed_dims.
             mask (Tensor): The key_padding_mask used for encoder and decoder,
-                with shape [bs, h, w].
+                with shape [bs, v, h, w].
             query_embed (Tensor): The query embedding for decoder, with shape
                 [num_query, c].
             pos_embed (Tensor): The positional encoding for encoder and
@@ -45,34 +47,49 @@ class MVTransformer(Transformer):
             tuple[Tensor]: results of decoder containing the following tensor.
 
                 - out_dec: Output from decoder. If return_intermediate_dec \
-                      is True output has shape [num_dec_layers, bs,
-                      num_query, embed_dims], else has shape [1, bs, \
+                      is True output has shape [num_dec_layers, bs, views,
+                      num_query, embed_dims], else has shape [1, bs, views, \
                       num_query, embed_dims].
                 - memory: Output results from encoder, with shape \
-                      [bs, embed_dims, h, w].
+                      [bs, v, embed_dims, h, w].
         """
         bs, v, c, h, w = x.shape
         # use `view` instead of `flatten` for dynamically exporting to ONNX
         x = x.view(bs, v, c, -1).permute(1, 3, 0, 2)  # [bs, v, c, h, w] -> [v, h*w, bs, c]
-        pos_embed = pos_embed.view(bs, c, -1).permute(2, 0, 1)
-        query_embed = query_embed.unsqueeze(1).repeat(
-            1, bs, 1)  # [num_query, dim] -> [num_query, bs, dim]
-        mask = mask.view(bs, -1)  # [bs, h, w] -> [bs, h*w]
-        memory = self.encoder(
-            query=x,
+        pos_embed = pos_embed.view(bs, v, c, -1).permute(1, 3, 0, 2)
+        query_embed = query_embed.unsqueeze(1).unsqueeze(0).repeat(
+            1, bs, 1)  # [num_query, dim] -> [v, num_query, bs, dim]
+        mask = mask.view(bs, v, -1)  # [bs, v, h, w] -> [bs, v, h*w]
+
+        memory = torch.stack([self.encoder(
+            query=x[_v],
             key=None,
             value=None,
-            query_pos=pos_embed,
-            query_key_padding_mask=mask)
+            query_pos=pos_embed[_v],
+            query_key_padding_mask=mask[:, _v, :]) for _v in range(v)])
         target = torch.zeros_like(query_embed)
-        # out_dec: [num_layers, num_query, bs, dim]
-        out_dec = self.decoder(
-            query=target,
-            key=memory,
-            value=memory,
-            key_pos=pos_embed,
-            query_pos=query_embed,
-            key_padding_mask=mask)
-        out_dec = out_dec.transpose(1, 2)
-        memory = memory.permute(1, 2, 0).reshape(bs, c, h, w)
+        # out_dec: [num_layers, views, num_query, bs, dim]
+        if self.single_view:
+            out_dec = torch.stack([self.decoder(
+                query=target,
+                key=memory[_v],
+                value=memory[_v],
+                key_pos=pos_embed[_v],
+                query_pos=query_embed,
+                key_padding_mask=mask[:, _v, :]) for _v in range(v)], dim=1)
+        else:
+            appended_memory = memory.view(-1, bs, c)
+            appended_pos_embed = pos_embed.view(-1, bs, c)
+            appended_mask = mask.view(bs, -1)
+            out_dec = self.decoder(
+                query=target,
+                key=appended_memory,
+                value=appended_memory,
+                key_pos=appended_pos_embed,
+                query_pos=query_embed,
+                key_padding_mask=appended_mask)
+            num_layers = out_dec.shape[0]
+            out_dec = out_dec.view(num_layers, v, -1, bs, c)
+        out_dec = out_dec.permute(3, 1, 2)
+        memory = memory.permute(2, 0, 3, 1).reshape(bs, v, c, h, w)
         return out_dec, memory
