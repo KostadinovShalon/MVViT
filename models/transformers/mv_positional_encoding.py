@@ -62,7 +62,7 @@ class MVSinePositionalEncoding(BaseModule):
 
         Returns:
             pos (Tensor): Returned position embedding with shape
-                [bs, v, num_feats*3, h, w].
+                [bs, num_feats*3, v, h, w].
         """
         # For convenience of exporting to ONNX, it's required to convert
         # `masks` from bool to int.
@@ -83,7 +83,7 @@ class MVSinePositionalEncoding(BaseModule):
         # use `view` instead of `flatten` for dynamically exporting to ONNX
         B, V, H, W = mask.size()
         pos_v = torch.stack(
-            (pos_x[:, :, :, :, 0::2].sin(), pos_x[:, :, :, :, 1::2].cos()),
+            (pos_v[:, :, :, :, 0::2].sin(), pos_v[:, :, :, :, 1::2].cos()),
             dim=5).view(B, V, H, W, -1)
         pos_x = torch.stack(
             (pos_x[:, :, :, :, 0::2].sin(), pos_x[:, :, :, :, 1::2].cos()),
@@ -91,8 +91,8 @@ class MVSinePositionalEncoding(BaseModule):
         pos_y = torch.stack(
             (pos_y[:, :, :, :, 0::2].sin(), pos_y[:, :, :, :, 1::2].cos()),
             dim=5).view(B, V, H, W, -1)
-        pos = torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)
-        return pos
+        pos = torch.cat((pos_v, pos_y, pos_x), dim=4).permute(0, 4, 1, 2, 3)
+        return pos[:, :self.num_feats, ...]
 
     def __repr__(self):
         """str: a string that describes the module"""
