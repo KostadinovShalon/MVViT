@@ -59,7 +59,27 @@ class MVResize(Resize):
             Defaults to False.
     """
 
-    def _random_scale(self, results):
+    @staticmethod
+    def random_select(img_scales, seed=None):
+        """Randomly select an img_scale from given candidates.
+
+        Args:
+            img_scales (list[tuple]): Images scales for selection.
+
+        Returns:
+            (tuple, int): Returns a tuple ``(img_scale, scale_dix)``, \
+                where ``img_scale`` is the selected image scale and \
+                ``scale_idx`` is the selected index in the given candidates.
+        """
+
+        assert mmcv.is_list_of(img_scales, tuple)
+        if seed is not None:
+            np.random.seed(seed)
+        scale_idx = np.random.randint(len(img_scales))
+        img_scale = img_scales[scale_idx]
+        return img_scale, scale_idx
+
+    def _random_scale(self, results, seed=None):
         """Randomly sample an img_scale according to ``ratio_range`` and
         ``multiscale_mode``.
 
@@ -85,7 +105,7 @@ class MVResize(Resize):
         elif self.multiscale_mode == 'range':
             scale, scale_idx = self.random_sample(self.img_scale)
         elif self.multiscale_mode == 'value':
-            scale, scale_idx = self.random_select(self.img_scale)
+            scale, scale_idx = self.random_select(self.img_scale, seed)
         else:
             raise NotImplementedError
 
@@ -198,7 +218,8 @@ class MVResize(Resize):
                     scales.append(tuple([int(x * scale_factor) for x in img_shape][::-1]))
                 results['scale'] = tuple(scales)
             else:
-                self._random_scale(results)
+                seed = results['seed'] if 'seed' in results else None
+                self._random_scale(results, seed)
         else:
             if not self.override:
                 assert 'scale_factors' not in results, (
@@ -207,7 +228,8 @@ class MVResize(Resize):
                 results.pop('scale')
                 if 'scale_factor' in results:
                     results.pop('scale_factor')
-                self._random_scale(results)
+                seed = results['seed'] if 'seed' in results else None
+                self._random_scale(results, seed)
 
         self._resize_img(results)
         self._resize_bboxes(results)
@@ -307,8 +329,8 @@ class MVPad(Pad):
     PADDING IS ALWAYS DONE ON RIGHT AND BOTTOM, SO BBOXES ARE NOT MODIFIED
     """
 
-    def __init__(self, size=None, size_divisor=None, pad_val=0, pad_to_centre=False):
-        super().__init__(size, size_divisor, False, pad_val)
+    def __init__(self, size=None, size_divisor=None, pad_val=0, pad_to_centre=False, pad_to_square=False):
+        super().__init__(size, size_divisor, pad_to_square, pad_val)
         self.pad_to_centre = pad_to_centre
 
     def _pad_img(self, results):
@@ -316,6 +338,9 @@ class MVPad(Pad):
         for key in results.get('img_fields', ['img']):
             padded_imgs = []
             for img in results[key]:
+                if self.pad_to_square:
+                    max_size = max(img.shape[:2])
+                    self.size = (max_size, max_size)
                 if self.size is not None:
                     if self.pad_to_centre:
                         h, w, _ = img.shape

@@ -46,6 +46,10 @@ class MVCTResNetNeck(CTResNetNeck):
         x = x.view(-1, *x.shape[2:])  # (b.v) x f x w' x h' ordered per view
         return x,
 
+    def init_weights(self):
+        super().init_weights()
+        self.transformer.init_weights()
+
     def mv_transformer(self, x, with_attn_weights=False):
         x = self.positional_encoding(x)
 

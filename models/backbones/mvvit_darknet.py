@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mmcv.cnn import ConvModule, constant_init, kaiming_init
+from mmcv.cnn import ConvModule, constant_init, kaiming_init, xavier_init
 from mmcv.runner import load_checkpoint, BaseModule
 from torch.nn import Parameter
 from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
@@ -361,6 +361,12 @@ class MVTransformer(nn.Transformer):
         self.mode = mode
         super(MVTransformer, self).__init__(d_model, nhead, num_decoder_layers, num_decoder_layers, dim_feedforward,
                                             dropout, activation, custom_decoder=decoder)
+
+    def init_weights(self):
+        # follow the official DETR to init parameters
+        for m in self.modules():
+            if hasattr(m, 'weight') and m.weight.dim() > 1:
+                xavier_init(m, distribution='uniform')
 
     def forward(self, src, tgt, src_mask=None, tgt_mask=None,
                 memory_mask=None, src_key_padding_mask=None,

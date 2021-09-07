@@ -117,11 +117,10 @@ data = dict(
 optimizer = dict(
     type='AdamW',
     lr=0.0001,
-    weight_decay=0.0001,)
-    # paramwise_cfg=dict(
-    #     custom_keys={'backbone': dict(lr_mult=0.1, decay_mult=1.0)}))
+    weight_decay=0.0001,
+    paramwise_cfg=dict(
+        custom_keys={'backbone': dict(lr_mult=0.1, decay_mult=1.0)}))
 optimizer_config = dict(grad_clip=dict(max_norm=0.1, norm_type=2))
 # learning policy
-lr_config = dict(policy='step', step=[25, 30])
-runner = dict(type='EpochBasedRunner', max_epochs=35)
-load_from = 'checkpoints/detr_r50_8x2_150e_coco_20201130_194835-2c4b8974.pth'
+lr_config = dict(policy='step', step=[100])
+runner = dict(type='EpochBasedRunner', max_epochs=150)

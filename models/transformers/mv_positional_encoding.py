@@ -50,7 +50,14 @@ class MVSinePositionalEncoding(BaseModule):
         self.scale = scale
         self.eps = eps
         self.offset = offset
-        self.pos_dimension = self.num_feats // 3 + 1
+        self.pos_emb_dim = num_feats
+        if self.pos_emb_dim % 6:  # Not divisible by 6
+            if self.pos_emb_dim % 3 == 0:  # Div by 3 but no by 2, then add 3
+                self.pos_emb_dim += 3
+            else:
+                self.pos_emb_dim = (self.pos_emb_dim + 1) if (self.pos_emb_dim + 2) % 6 else self.pos_emb_dim + 2
+        self.pos_emb_dim /= 3  # TODO: improve algorithm, since we are looking for the division only
+
 
     def forward(self, mask):
         """Forward function for `SinePositionalEncoding`.
@@ -62,7 +69,7 @@ class MVSinePositionalEncoding(BaseModule):
 
         Returns:
             pos (Tensor): Returned position embedding with shape
-                [bs, num_feats*3, v, h, w].
+                [bs, num_feats*2, h, w*v].
         """
         # For convenience of exporting to ONNX, it's required to convert
         # `masks` from bool to int.
@@ -75,8 +82,8 @@ class MVSinePositionalEncoding(BaseModule):
             v_embed = (v_embed + self.offset) / (v_embed[:, -1:, :, :] + self.eps) * self.scale
             y_embed = (y_embed + self.offset) / (y_embed[:, :, -1:, :] + self.eps) * self.scale
             x_embed = (x_embed + self.offset) / (x_embed[:, :, :, -1:] + self.eps) * self.scale
-        dim_t = torch.arange(self.pos_dimension, dtype=torch.float32, device=mask.device)
-        dim_t = self.temperature ** (2 * (dim_t // 2) / self.pos_dimension)
+        dim_t = torch.arange(self.pos_emb_dim, dtype=torch.float32, device=mask.device)
+        dim_t = self.temperature ** (2 * (dim_t // 2) / self.pos_emb_dim)
         pos_v = v_embed[:, :, :, :, None] / dim_t
         pos_x = x_embed[:, :, :, :, None] / dim_t
         pos_y = y_embed[:, :, :, :, None] / dim_t
@@ -92,7 +99,7 @@ class MVSinePositionalEncoding(BaseModule):
             (pos_y[:, :, :, :, 0::2].sin(), pos_y[:, :, :, :, 1::2].cos()),
             dim=5).view(B, V, H, W, -1)
         pos = torch.cat((pos_v, pos_y, pos_x), dim=4).permute(0, 1, 4, 2, 3)
-        return pos[:, :self.num_feats, ...]
+        return pos[:, :, :self.num_feats, ...]
 
     def __repr__(self):
         """str: a string that describes the module"""

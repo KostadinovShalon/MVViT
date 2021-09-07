@@ -30,11 +30,13 @@ class LoadMVImagesFromFile(object):
     def __init__(self,
                  to_float32=False,
                  color_type='color',
-                 file_client_args=dict(backend='disk')):
+                 file_client_args=dict(backend='disk'),
+                 img_scale=None):
         self.to_float32 = to_float32
         self.color_type = color_type
         self.file_client_args = file_client_args.copy()
         self.file_client = None
+        self.img_scale = img_scale
 
     def __call__(self, results):
         """Call functions to load image and get image meta information.
@@ -65,6 +67,7 @@ class LoadMVImagesFromFile(object):
         results['img_shape'] = tuple(img.shape for img in imgs)
         results['ori_shape'] = tuple(img.shape for img in imgs)
         results['img_field'] = ['img']
+        results['seed'] = np.random.randint(10000)
         return results
 
     def __repr__(self):
