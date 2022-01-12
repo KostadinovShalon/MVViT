@@ -377,8 +377,8 @@ class MVCocoDataset(CustomMVDataset):
         result_files = []
         for v in range(self.views):
             view_results = results[v::self.views]
-            jsonfile_prefix += f"_{v}"
-            result_files.append(self.results2json(view_results, jsonfile_prefix))
+            view_jsonfile_prefix = f"{jsonfile_prefix}_{v}"
+            result_files.append(self.results2json(view_results, view_jsonfile_prefix))
         return result_files, tmp_dir
 
     def evaluate(self,
