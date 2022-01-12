@@ -354,7 +354,7 @@ class MVCocoDataset(CustomMVDataset):
 
         Args:
             results (list[tuple | numpy.ndarray]): Testing results of the
-                dataset.
+                dataset. It contains B*V elements
             jsonfile_prefix (str | None): The prefix of json files. It includes
                 the file path and the prefix of filename, e.g., "a/b/prefix".
                 If not specified, a temp file will be created. Default: None.
@@ -374,7 +374,11 @@ class MVCocoDataset(CustomMVDataset):
             jsonfile_prefix = osp.join(tmp_dir.name, 'results')
         else:
             tmp_dir = None
-        result_files = self.results2json(results, jsonfile_prefix)
+        result_files = []
+        for v in range(self.views):
+            view_results = results[v::self.views]
+            jsonfile_prefix += f"_{v}"
+            result_files.append(self.results2json(view_results, jsonfile_prefix))
         return result_files, tmp_dir
 
     def evaluate(self,
