@@ -117,7 +117,6 @@ train_pipeline = [
 # setting (size_divisor=32). While there is little effect on the performance
 # whether we use the default setting or use size_divisor=1.
 test_pipeline = [
-    dict(type='LoadImageFromFile'),
     dict(type='LoadMVImagesFromFile', to_float32=True),
     dict(
         type='MVMultiScaleFlipAug',
