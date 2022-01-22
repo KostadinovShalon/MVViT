@@ -120,6 +120,8 @@ class MVDeformableDETRHead(DeformableDETRHead):
             if self.as_two_stage:
                 mv_enc_outputs_class.append(enc_outputs_class)
                 mv_enc_outputs_coord.append(enc_outputs_coord.sigmoid())
+        mv_outputs_classes = torch.cat(mv_outputs_classes, dim=1)
+        mv_outputs_coords = torch.cat(mv_outputs_coords, dim=1)
         if self.as_two_stage:
             return mv_outputs_classes, mv_outputs_coords, \
                 mv_enc_outputs_class, \
@@ -245,20 +247,17 @@ class MVDeformableDETRHead(DeformableDETRHead):
                 (n,) tensor where each item is the predicted class label of \
                 the corresponding box.
         """
-        views = len(all_cls_scores)
+        cls_scores = all_cls_scores[-1]
+        bbox_preds = all_bbox_preds[-1]
 
         result_list = []
         for img_id in range(len(img_metas)):
-            for v in range(views):
-                cls_scores = all_cls_scores[v][-1]
-                bbox_preds = all_bbox_preds[v][-1]
-
-                cls_score = cls_scores[img_id]
-                bbox_pred = bbox_preds[img_id]
-                img_shape = img_metas[img_id]['img_shape'][v]
-                scale_factor = img_metas[img_id]['scale_factor'][v]
-                proposals = self._get_bboxes_single(cls_score, bbox_pred,
-                                                    img_shape, scale_factor,
-                                                    rescale)
-                result_list.append(proposals)
+            cls_score = cls_scores[img_id]
+            bbox_pred = bbox_preds[img_id]
+            img_shape = img_metas[img_id]['img_shape']
+            scale_factor = img_metas[img_id]['scale_factor']
+            proposals = self._get_bboxes_single(cls_score, bbox_pred,
+                                                img_shape, scale_factor,
+                                                rescale)
+            result_list.append(proposals)
         return result_list
