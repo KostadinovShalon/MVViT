@@ -13,7 +13,7 @@ class MVResNet(ResNet):
             mv_outs.append(super().forward(xv))
         outs = []
         for i, _ in enumerate(self.out_indices):
-            single_layer_mv_out = [sv_outs[i] for sv_outs in mv_outs]
-            single_layer_mv_out = torch.stack(single_layer_mv_out).transpose(0, 1)
+            single_layer_mv_out = [sv_outs[i] for sv_outs in mv_outs]  # list of V items of BCWH tensors
+            single_layer_mv_out = torch.stack(single_layer_mv_out).transpose(0, 1)  # B V C H W
             outs.append(single_layer_mv_out)
-        return tuple(outs)
+        return tuple(outs)  # list of N items of B V C H W tensors

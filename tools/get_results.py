@@ -1,7 +1,8 @@
 import argparse
 import json
 
-from mmdet.datasets.api_wrappers import COCOeval, COCO
+import numpy as np
+import scipy.optimize
 
 
 def get_iou(box1, box2):
@@ -33,10 +34,13 @@ def main():
     all_results = args.results
     th = args.th
     assert len(all_data) == len(all_results)
-    # all_data = [json.load(open(data, 'r')) for data in all_data]
-    # all_results = [json.load(open(result, 'r')) for result in all_results]
+    all_data = [json.load(open(data, 'r')) for data in all_data]
+    all_results = [json.load(open(result, 'r')) for result in all_results]
 
     modp = 0
+    misses = 0
+    fps = 0
+    ng = 0
     frames = 0
     for data, results in zip(all_data, all_results):
         imgs = data['images']
@@ -44,26 +48,38 @@ def main():
         gts = {im['id']: [ann for ann in anns if ann['image_id'] == im['id']] for im in imgs}
         results = {im['id']: [r for r in results if r['image_id'] == im['id']] for im in imgs}
 
-        for k in gts.keys():
-            i_gt = gts[k]  # lists of objects in the ith frame
-            i_result = results[k]  # list of results of the ith frame
+        for i_gt, i_result in zip(gts.values(), results.values()):
+            # i_gt list of objects in the ith frame
+            # i_result list of results of the ith frame
+            ng += len(i_gt)
+            if len(i_gt) > 0 and len(i_result) > 0:
+                cost_matrix = [[get_iou(obj['bbox'], b['bbox']) if obj['category_id'] == b['category_id'] else 0
+                                for b in i_result]
+                               for obj in i_gt]  # Ng x Nd matrix
+                cost_matrix = np.array(cost_matrix)
+                row_id, col_id = scipy.optimize.linear_sum_assignment(cost_matrix, maximize=True)
+                overlap_ratio = cost_matrix[row_id, col_id].sum()
+                n_mapped = len(row_id)
+                if n_mapped > 0:
+                    modp += overlap_ratio / len(row_id)
 
-            overlap_ratio = 0
-            n_mapped = 0
-            for obj in i_gt:
-                category = obj['category_id']
-                box = obj['bbox']
-                COCOeval()
-                ious = [get_iou(box, b['bbox']) if category == b['category_id'] else 0 for b in i_result]
-                if len(ious) > 0:
-                    max_iou = max(ious)
-                    if max_iou > th:
-                        overlap_ratio += max_iou
-                        n_mapped += 1
-            if n_mapped > 0:
-                modp += overlap_ratio / n_mapped
+                gt_iou = cost_matrix.max(axis=1)
+                misses_t = gt_iou <= th
+                misses += misses_t.sum()
+
+                det_iou = cost_matrix.max(axis=0)
+                fps_t = det_iou <= th
+                fps += fps_t.sum()
+
+            elif ng > 0:  # no predictions, ng misses
+                misses += ng
+            else:  # ng = 0, no misses, false positives = predictions
+                fps += len(i_result)
+
         frames += len(gts.keys())
     modp /= frames
+    moda = 1 - (misses + fps) / ng
+    print(f"MODA: {moda}")
     print(f"MODP: {modp}")
 
 
