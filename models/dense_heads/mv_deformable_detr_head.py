@@ -165,9 +165,18 @@ class MVDeformableDETRHead(DeformableDETRHead):
         Returns:
             dict[str, Tensor]: A dictionary of loss components.
         """
+        gt_bboxes_list = [v_b_gt_bboxes for b_gt_bboxes in gt_bboxes_list for v_b_gt_bboxes in b_gt_bboxes]
+        gt_labels_list = [v_b_gt_labels for b_gt_labels in gt_labels_list for v_b_gt_labels in b_gt_labels]
+        img_metas = [
+            {k: (val[v] if k not in ("img_norm_cfg", "batch_input_shape") else val) for k, val in img_meta.items()} for
+            img_meta in
+            img_metas for v in range(len(img_meta['img_shape']))]
+        all_cls_scores = [scores[-1] for scores in all_cls_scores]  # V list of scores
+        all_cls_scores = torch.stack(all_cls_scores).transpose(0, 1)
+        all_bbox_preds = [preds[-1] for preds in all_bbox_preds]
+        all_bbox_preds = torch.stack(all_bbox_preds).transpose(0, 1)
         assert gt_bboxes_ignore is None, \
-            f'{self.__class__.__name__} only supports ' \
-            f'for gt_bboxes_ignore setting to None.'
+            'Only supports for gt_bboxes_ignore setting to None.'
 
         num_dec_layers = len(all_cls_scores)
         all_gt_bboxes_list = [gt_bboxes_list for _ in range(num_dec_layers)]
@@ -183,20 +192,6 @@ class MVDeformableDETRHead(DeformableDETRHead):
             all_gt_bboxes_ignore_list)
 
         loss_dict = dict()
-        # loss of proposal generated from encode feature map.
-        if enc_cls_scores is not None:
-            binary_labels_list = [
-                torch.zeros_like(gt_labels_list[i])
-                for i in range(len(img_metas))
-            ]
-            enc_loss_cls, enc_losses_bbox, enc_losses_iou = \
-                self.loss_single(enc_cls_scores, enc_bbox_preds,
-                                 gt_bboxes_list, binary_labels_list,
-                                 img_metas, gt_bboxes_ignore)
-            loss_dict['enc_loss_cls'] = enc_loss_cls
-            loss_dict['enc_loss_bbox'] = enc_losses_bbox
-            loss_dict['enc_loss_iou'] = enc_losses_iou
-
         # loss from the last decoder layer
         loss_dict['loss_cls'] = losses_cls[-1]
         loss_dict['loss_bbox'] = losses_bbox[-1]
