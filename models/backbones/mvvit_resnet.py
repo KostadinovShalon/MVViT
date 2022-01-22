@@ -32,7 +32,7 @@ class MVViTResNet(ResNet):
                  zero_init_residual=True,
                  pretrained=None,
                  init_cfg=None,
-                 combination_block=4,
+                 combination_block=-1,
                  nhead=8,
                  num_decoder_layers=1,
                  positional_encoding=True,
