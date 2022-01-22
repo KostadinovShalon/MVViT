@@ -53,7 +53,7 @@ class MVViTResNet(ResNet):
         self.shared_transformer = shared_transformer
 
         # Obtaining sampling points
-        assert max(self.combination_blocks) <= len(self.layers)
+        assert max(self.combination_blocks) <= num_stages + 1
         self.grid_sizes = []
         self.positional_encoding = {} if positional_encoding else None
         self.transformers = {}

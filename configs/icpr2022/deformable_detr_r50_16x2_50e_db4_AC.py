@@ -3,7 +3,7 @@ _base_ = [
 ]
 
 custom_imports = dict(imports=['MVViT.models.backbones.mvvit_resnet',
-                               'MVViT.models.dense_heads.mv_channel_mapper',
+                               'MVViT.models.necks.mv_channel_mapper',
                                'MVViT.models.dense_heads.mv_deformable_detr_head',
                                'MVViT.datasets.pipelines.formatting',
                                'MVViT.datasets.pipelines.loading',
@@ -35,7 +35,7 @@ model = dict(
     bbox_head=dict(
         type='MVDeformableDETRHead',
         num_query=300,
-        num_classes=80,
+        num_classes=4,
         in_channels=2048,
         sync_cls_avg_factor=True,
         as_two_stage=False,
@@ -136,7 +136,7 @@ test_pipeline = [
 classes = ('firearm', 'laptop', 'knife', 'camera')
 dataset_type = 'MVCocoDataset'
 data = dict(
-    samples_per_gpu=3,
+    samples_per_gpu=2,
     workers_per_gpu=2,
     train=dict(
         _delete_=True,
