@@ -247,13 +247,16 @@ class MVDeformableDETRHead(DeformableDETRHead):
         bbox_preds = all_bbox_preds[-1]
 
         result_list = []
+        views = len(img_metas[0]['img_shape'])
         for img_id in range(len(img_metas)):
-            cls_score = cls_scores[img_id]
-            bbox_pred = bbox_preds[img_id]
-            img_shape = img_metas[img_id]['img_shape']
-            scale_factor = img_metas[img_id]['scale_factor']
-            proposals = self._get_bboxes_single(cls_score, bbox_pred,
-                                                img_shape, scale_factor,
-                                                rescale)
-            result_list.append(proposals)
+            for v in range(views):
+                cls_score = cls_scores[img_id * views + v]
+                bbox_pred = bbox_preds[img_id * views + v]
+                img_shape = img_metas[img_id]['img_shape'][v]
+                scale_factor = img_metas[img_id]['scale_factor'][v]
+                proposals = self._get_bboxes_single(cls_score, bbox_pred,
+                                                    img_shape, scale_factor,
+                                                    rescale)
+                result_list.append(proposals)
+
         return result_list
