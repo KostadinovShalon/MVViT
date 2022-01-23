@@ -23,6 +23,7 @@ model = dict(
         norm_cfg=dict(type='BN', requires_grad=False),
         norm_eval=True,
         style='pytorch',
+        views=7,
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     neck=dict(
         type='MVChannelMapper',
@@ -135,7 +136,7 @@ test_pipeline = [
 classes = ('person',)
 dataset_type = 'MVCocoDataset'
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=1,
     workers_per_gpu=2,
     train=dict(
         _delete_=True,
