@@ -104,8 +104,7 @@ train_pipeline = [
     dict(
         type='MVResize',
         img_scale=[(480, 1333), (512, 1333), (544, 1333), (576, 1333),
-                   (608, 1333), (640, 1333), (672, 1333), (704, 1333),
-                   (736, 1333), (768, 1333), (800, 1333)],
+                   (608, 1333)],
         multiscale_mode='value',
         keep_ratio=True),
     dict(type='MVNormalize', **img_norm_cfg),
@@ -121,7 +120,7 @@ test_pipeline = [
     dict(type='LoadMVImagesFromFile', to_float32=True),
     dict(
         type='MVMultiScaleFlipAug',
-        img_scale=(1333, 800),
+        img_scale=(1333, 608),
         flip=False,
         transforms=[
             dict(type='MVPad', pad_to_square=True, pad_val=(1., 1., 1.)),
