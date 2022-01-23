@@ -692,7 +692,7 @@ class MVViTDarknet(BaseModule):
             if i in self.out_indices:
                 outs.append(x)
 
-        outs = [out.view(-1, *out.shape[2:]) for out in outs]  # (v . b) x f x w' x h' ordered per view
+        outs = [out.view(-1, *out.shape[2:]) for out in outs]  # (b . v) x f x w' x h' ordered per view
 
         if with_attn_weights:
             return tuple(outs), attn

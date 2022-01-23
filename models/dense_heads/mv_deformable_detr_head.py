@@ -120,8 +120,8 @@ class MVDeformableDETRHead(DeformableDETRHead):
             if self.as_two_stage:
                 mv_enc_outputs_class.append(enc_outputs_class)
                 mv_enc_outputs_coord.append(enc_outputs_coord.sigmoid())
-        mv_outputs_classes = torch.cat(mv_outputs_classes, dim=0)
-        mv_outputs_coords = torch.cat(mv_outputs_coords, dim=0)
+        mv_outputs_classes = torch.stack(mv_outputs_classes, dim=1).transpose(1, 2).flatten(1, 2)
+        mv_outputs_coords = torch.stack(mv_outputs_coords, dim=1).transpose(1, 2).flatten(1, 2)
         if self.as_two_stage:
             return mv_outputs_classes, mv_outputs_coords, \
                 mv_enc_outputs_class, \
@@ -174,10 +174,8 @@ class MVDeformableDETRHead(DeformableDETRHead):
             {k: (val[v] if k not in ("img_norm_cfg", "batch_input_shape") else val) for k, val in img_meta.items()} for
             img_meta in
             img_metas for v in range(len(img_meta['img_shape']))]
-        all_cls_scores = [scores[-1] for scores in all_cls_scores]  # V list of scores
-        all_cls_scores = torch.stack(all_cls_scores).transpose(0, 1)
-        all_bbox_preds = [preds[-1] for preds in all_bbox_preds]
-        all_bbox_preds = torch.stack(all_bbox_preds).transpose(0, 1)
+        all_cls_scores = all_cls_scores[-1]
+        all_bbox_preds = all_bbox_preds[-1]
         assert gt_bboxes_ignore is None, \
             'Only supports for gt_bboxes_ignore setting to None.'
 
