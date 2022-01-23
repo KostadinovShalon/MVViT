@@ -174,8 +174,6 @@ class MVDeformableDETRHead(DeformableDETRHead):
             {k: (val[v] if k not in ("img_norm_cfg", "batch_input_shape") else val) for k, val in img_meta.items()} for
             img_meta in
             img_metas for v in range(len(img_meta['img_shape']))]
-        all_cls_scores = all_cls_scores[-1]
-        all_bbox_preds = all_bbox_preds[-1]
         assert gt_bboxes_ignore is None, \
             'Only supports for gt_bboxes_ignore setting to None.'
 
