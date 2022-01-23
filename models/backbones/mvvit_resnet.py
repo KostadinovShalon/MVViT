@@ -124,7 +124,7 @@ class MVViTResNet(ResNet):
             other_views = [xv.permute(0, 2, 3, 1) for i, xv in enumerate(x) if i != v]
             layer_name = self.transformers[comb_block] if self.shared_transformer else self.transformers[comb_block][v]
             t = getattr(self, layer_name)
-            output, wts = t(other_views, x[v].permute(0, 2, 3, 1))  # a "n_dec" list of "v-1" list of tensors
+            output, wts = t(other_views, x[v].permute(0, 2, 3, 1), need_attn_weights=with_attn_weights)  # a "n_dec" list of "v-1" list of tensors
             outputs.append(output.permute(0, 3, 1, 2))  # B x C x H x W
             if with_attn_weights:
                 attn_weights.append(torch.stack(wts[0]))  # (V-1) x B x H x W x H x W TODO: change to all attns

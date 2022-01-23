@@ -370,7 +370,8 @@ class MVTransformer(nn.Transformer):
 
     def forward(self, src, tgt, src_mask=None, tgt_mask=None,
                 memory_mask=None, src_key_padding_mask=None,
-                tgt_key_padding_mask=None, memory_key_padding_mask=None):
+                tgt_key_padding_mask=None, memory_key_padding_mask=None,
+                need_attn_weights=False):
         r"""Take in and process masked source/target sequences.
 
         Args:
@@ -427,7 +428,8 @@ class MVTransformer(nn.Transformer):
             memory = torch.cat(memory, dim=-1)
         output, attn_weights = self.decoder(tgt, memory, tgt_mask=tgt_mask, memory_mask=memory_mask,
                                             tgt_key_padding_mask=tgt_key_padding_mask,
-                                            memory_key_padding_mask=memory_key_padding_mask)
+                                            memory_key_padding_mask=memory_key_padding_mask,
+                                            need_attn_weights=need_attn_weights)
         return output, attn_weights
 
 
@@ -435,7 +437,8 @@ class TransformerDecoder(nn.TransformerDecoder):
 
     def forward(self, tgt, memory, tgt_mask=None,
                 memory_mask=None, tgt_key_padding_mask=None,
-                memory_key_padding_mask=None):
+                memory_key_padding_mask=None,
+                need_attn_weights=False):
         r"""Pass the inputs (and mask) through the decoder layer in turn.
 
         Args:
@@ -456,7 +459,8 @@ class TransformerDecoder(nn.TransformerDecoder):
             output, attn_weights = mod(output, memory, tgt_mask=tgt_mask,
                                        memory_mask=memory_mask,
                                        tgt_key_padding_mask=tgt_key_padding_mask,
-                                       memory_key_padding_mask=memory_key_padding_mask)
+                                       memory_key_padding_mask=memory_key_padding_mask,
+                                       need_attn_weights=need_attn_weights)
             attn_weights_list.append(attn_weights)
 
         if self.norm is not None:
@@ -504,7 +508,8 @@ class MVTransformerDecoderLayer(nn.TransformerDecoderLayer):
         self.other_views = other_views
 
     def forward(self, tgt, memory, tgt_mask=None, memory_mask=None,
-                tgt_key_padding_mask=None, memory_key_padding_mask=None):
+                tgt_key_padding_mask=None, memory_key_padding_mask=None,
+                need_attn_weights=False):
         r"""Pass the inputs (and mask) through the decoder layer.
 
         Args:
@@ -527,7 +532,7 @@ class MVTransformerDecoderLayer(nn.TransformerDecoderLayer):
             for v in range(self.other_views):
                 _tgt2, _attn_weights = self.multihead_attn[v](tgt, memory[v], memory[v], attn_mask=memory_mask,
                                                               key_padding_mask=memory_key_padding_mask,
-                                                              need_weights=True)
+                                                              need_weights=need_attn_weights)
                 tgt2.append(_tgt2)
                 attn_weights.append(_attn_weights)
             tgt2 = torch.stack(tgt2).sum(dim=0)
