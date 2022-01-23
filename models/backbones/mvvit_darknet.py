@@ -191,7 +191,7 @@ class MultiheadAttentionND(nn.Module):
         """
 
         bsz, embed_dim = query.size(0), query.size(-1)
-        assert embed_dim == self.embed_dim
+        assert embed_dim == self.embed_dim, f"Embed dim: {embed_dim}, self.embed_dim: {self.embed_dim}"
         # allow MHA to have different sizes for the feature dimension
         q_extra_dims = query.shape[1:-1]
         k_extra_dims = key.shape[1:-1]

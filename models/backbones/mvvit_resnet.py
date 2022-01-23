@@ -70,7 +70,7 @@ class MVViTResNet(ResNet):
                 elif cb == 1:
                     fus_ft_dims = self.base_channels
                 else:
-                    fus_ft_dims = (self.base_channels * 2 ** (cb - 1)) * self.block.expansion
+                    fus_ft_dims = (self.base_channels * 2 ** (cb - 2)) * self.block.expansion
 
                 if positional_encoding:
                     self.positional_encoding[cb] = MultiViewPositionalEncoding(fus_ft_dims)
