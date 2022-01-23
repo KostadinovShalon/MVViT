@@ -349,7 +349,7 @@ class MVCocoDataset(CustomMVDataset):
         ar = recalls.mean(axis=1)
         return ar
 
-    def format_results(self, results, jsonfile_prefix=None, **kwargs):
+    def format_results2(self, results, jsonfile_prefix=None, **kwargs):
         """Format the results to json (standard format for COCO evaluation).
 
         Args:
@@ -379,6 +379,34 @@ class MVCocoDataset(CustomMVDataset):
             view_results = results[v::self.views]
             view_jsonfile_prefix = f"{jsonfile_prefix}_{v}"
             result_files.append(self.results2json(view_results, view_jsonfile_prefix))
+        return result_files, tmp_dir
+
+    def format_results(self, results, jsonfile_prefix=None, **kwargs):
+        """Format the results to json (standard format for COCO evaluation).
+
+        Args:
+            results (list[tuple | numpy.ndarray]): Testing results of the
+                dataset.
+            jsonfile_prefix (str | None): The prefix of json files. It includes
+                the file path and the prefix of filename, e.g., "a/b/prefix".
+                If not specified, a temp file will be created. Default: None.
+
+        Returns:
+            tuple: (result_files, tmp_dir), result_files is a dict containing \
+                the json filepaths, tmp_dir is the temporal directory created \
+                for saving json files when jsonfile_prefix is not specified.
+        """
+        assert isinstance(results, list), 'results must be a list'
+        assert len(results) == len(self), (
+            'The length of results is not equal to the dataset len: {} != {}'.
+            format(len(results), len(self)))
+
+        if jsonfile_prefix is None:
+            tmp_dir = tempfile.TemporaryDirectory()
+            jsonfile_prefix = osp.join(tmp_dir.name, 'results')
+        else:
+            tmp_dir = None
+        result_files = self.results2json(results, jsonfile_prefix)
         return result_files, tmp_dir
 
     def evaluate(self,
