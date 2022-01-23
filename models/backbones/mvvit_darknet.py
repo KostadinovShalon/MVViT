@@ -524,7 +524,7 @@ class MVTransformerDecoderLayer(nn.TransformerDecoderLayer):
             see the docs in Transformer class.
         """
         tgt2 = self.self_attn(tgt, tgt, tgt, attn_mask=tgt_mask,
-                              key_padding_mask=tgt_key_padding_mask)[0]
+                              key_padding_mask=tgt_key_padding_mask, need_weights=False)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
         if self.mode == "add":
@@ -539,7 +539,7 @@ class MVTransformerDecoderLayer(nn.TransformerDecoderLayer):
         else:
             tgt2, attn_weights = self.multihead_attn(tgt, memory, memory, attn_mask=memory_mask,
                                                      key_padding_mask=memory_key_padding_mask,
-                                                     need_weights=True)
+                                                     need_weights=need_attn_weights)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
