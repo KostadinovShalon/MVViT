@@ -12,4 +12,4 @@ class MVChannelMapper(ChannelMapper):
         for sv_inputs in mv_inputs:
             sv_outs = super().forward(sv_inputs)  # tuple of sv outputs
             mv_outputs.append(sv_outs)
-        return mv_outputs
+        return mv_outputs  # [V] list of tensors

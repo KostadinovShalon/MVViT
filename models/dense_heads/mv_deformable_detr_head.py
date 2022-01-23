@@ -120,8 +120,8 @@ class MVDeformableDETRHead(DeformableDETRHead):
             if self.as_two_stage:
                 mv_enc_outputs_class.append(enc_outputs_class)
                 mv_enc_outputs_coord.append(enc_outputs_coord.sigmoid())
-        mv_outputs_classes = torch.cat(mv_outputs_classes, dim=1)
-        mv_outputs_coords = torch.cat(mv_outputs_coords, dim=1)
+        mv_outputs_classes = torch.cat(mv_outputs_classes, dim=0)
+        mv_outputs_coords = torch.cat(mv_outputs_coords, dim=0)
         if self.as_two_stage:
             return mv_outputs_classes, mv_outputs_coords, \
                 mv_enc_outputs_class, \
