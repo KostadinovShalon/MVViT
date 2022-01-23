@@ -37,7 +37,7 @@ class MVViTResNet(ResNet):
                  num_decoder_layers=1,
                  positional_encoding=True,
                  views=2,
-                 multiview_decoder_mode='add',
+                 multiview_decoder_mode='cat',
                  shared_transformer=False
                  ):
         super(MVViTResNet, self).__init__(depth, in_channels, stem_channels, base_channels, num_stages, strides,
