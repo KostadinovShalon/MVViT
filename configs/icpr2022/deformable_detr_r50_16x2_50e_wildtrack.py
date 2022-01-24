@@ -148,7 +148,9 @@ data = dict(
                    'data/Wildtrack/view1_train.json',
                    'data/Wildtrack/view2_train.json',
                    'data/Wildtrack/view3_train.json',
-                   'data/Wildtrack/view4_train.json',],
+                   'data/Wildtrack/view4_train.json',
+                   'data/Wildtrack/view5_train.json',
+                   'data/Wildtrack/view6_train.json'],
         pipeline=train_pipeline),
     val=dict(
         _delete_=True,
@@ -159,7 +161,9 @@ data = dict(
                    'data/Wildtrack/view1_val.json',
                    'data/Wildtrack/view2_val.json',
                    'data/Wildtrack/view3_val.json',
-                   'data/Wildtrack/view4_val.json',],
+                   'data/Wildtrack/view4_val.json',
+                   'data/Wildtrack/view5_val.json',
+                   'data/Wildtrack/view6_val.json'],
         pipeline=test_pipeline),
     test=dict(
         _delete_=True,
@@ -170,7 +174,9 @@ data = dict(
                    'data/Wildtrack/view1_val.json',
                    'data/Wildtrack/view2_val.json',
                    'data/Wildtrack/view3_val.json',
-                   'data/Wildtrack/view4_val.json',],
+                   'data/Wildtrack/view4_val.json',
+                   'data/Wildtrack/view5_val.json',
+                   'data/Wildtrack/view6_val.json'],
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(
