@@ -16,7 +16,7 @@ model = dict(
     type='DeformableDETR',
     backbone=dict(
         type='MVViTResNet',
-        depth=50,
+        depth=34,
         num_stages=4,
         out_indices=(1, 2, 3),
         frozen_stages=1,
@@ -25,7 +25,7 @@ model = dict(
         style='pytorch',
         views=7,
         shared_transformer=True,
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
+        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet34')),
     neck=dict(
         type='MVChannelMapper',
         in_channels=[512, 1024, 2048],
