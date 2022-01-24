@@ -24,6 +24,7 @@ model = dict(
         norm_eval=True,
         style='pytorch',
         views=7,
+        shared_transformer=True,
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     neck=dict(
         type='MVChannelMapper',
