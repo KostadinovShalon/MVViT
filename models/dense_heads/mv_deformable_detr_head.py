@@ -58,8 +58,8 @@ class MVDeformableDETRHead(DeformableDETRHead):
                 `None` would be returned.
         """
 
-        mv_outputs_classes = None
-        mv_outputs_coords = None
+        mv_outputs_classes = []
+        mv_outputs_coords = []
         mv_enc_outputs_class = []
         mv_enc_outputs_coord = []
         for v, mlvl_feats in enumerate(mvmlvl_feats):
@@ -115,17 +115,13 @@ class MVDeformableDETRHead(DeformableDETRHead):
 
             outputs_classes = torch.stack(outputs_classes)
             outputs_coords = torch.stack(outputs_coords)
-            if mv_outputs_classes is None:
-                mv_outputs_classes = outputs_classes
-                mv_outputs_coords = outputs_coords
-            else:
-                mv_outputs_classes = torch.stack([mv_outputs_classes, outputs_classes], dim=1)
-                mv_outputs_coords = torch.stack([mv_outputs_coords, outputs_coords], dim=1)
+            mv_outputs_classes.append(outputs_classes)
+            mv_outputs_coords.append(outputs_coords)
             if self.as_two_stage:
                 mv_enc_outputs_class.append(enc_outputs_class)
                 mv_enc_outputs_coord.append(enc_outputs_coord.sigmoid())
-        mv_outputs_classes = mv_outputs_classes.transpose(1, 2).flatten(1, 2)
-        mv_outputs_coords = mv_outputs_coords.transpose(1, 2).flatten(1, 2)
+        mv_outputs_classes = torch.stack(mv_outputs_classes, dim=1).transpose(1, 2).flatten(1, 2)
+        mv_outputs_coords = torch.stack(mv_outputs_coords, dim=1).transpose(1, 2).flatten(1, 2)
         if self.as_two_stage:
             return mv_outputs_classes, mv_outputs_coords, \
                 mv_enc_outputs_class, \
