@@ -28,7 +28,7 @@ model = dict(
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet34')),
     neck=dict(
         type='MVChannelMapper',
-        in_channels=[512, 1024, 2048],
+        in_channels=[128, 256, 512],
         kernel_size=1,
         out_channels=256,
         act_cfg=None,
