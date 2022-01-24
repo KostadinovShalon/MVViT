@@ -16,7 +16,7 @@ model = dict(
     type='DeformableDETR',
     backbone=dict(
         type='MVViTResNet',
-        depth=34,
+        depth=50,
         num_stages=4,
         out_indices=(1, 2, 3),
         frozen_stages=1,
@@ -25,10 +25,10 @@ model = dict(
         style='pytorch',
         views=7,
         shared_transformer=True,
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet34')),
+        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     neck=dict(
         type='MVChannelMapper',
-        in_channels=[128, 256, 512],
+        in_channels=[512, 1024, 2048],
         kernel_size=1,
         out_channels=256,
         act_cfg=None,
@@ -148,9 +148,7 @@ data = dict(
                    'data/Wildtrack/view1_train.json',
                    'data/Wildtrack/view2_train.json',
                    'data/Wildtrack/view3_train.json',
-                   'data/Wildtrack/view4_train.json',
-                   'data/Wildtrack/view5_train.json',
-                   'data/Wildtrack/view6_train.json'],
+                   'data/Wildtrack/view4_train.json',],
         pipeline=train_pipeline),
     val=dict(
         _delete_=True,
@@ -161,9 +159,7 @@ data = dict(
                    'data/Wildtrack/view1_val.json',
                    'data/Wildtrack/view2_val.json',
                    'data/Wildtrack/view3_val.json',
-                   'data/Wildtrack/view4_val.json',
-                   'data/Wildtrack/view5_val.json',
-                   'data/Wildtrack/view6_val.json'],
+                   'data/Wildtrack/view4_val.json',],
         pipeline=test_pipeline),
     test=dict(
         _delete_=True,
@@ -174,9 +170,7 @@ data = dict(
                    'data/Wildtrack/view1_val.json',
                    'data/Wildtrack/view2_val.json',
                    'data/Wildtrack/view3_val.json',
-                   'data/Wildtrack/view4_val.json',
-                   'data/Wildtrack/view5_val.json',
-                   'data/Wildtrack/view6_val.json'],
+                   'data/Wildtrack/view4_val.json',],
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(
