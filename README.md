@@ -40,7 +40,7 @@ Training and testing is done as usual in the MMDetection framework. New fields a
 YOLOv3 and Deformable DETR detectors, which are described next. 
 
 To integrate MVViT to YOLOv3, the following classes were added:
-- [MVViTDarknet](models/backbones/mvvit_darknet.py#10)
+- [MVViTDarknet](models/backbones/mvvit_darknet.py#L10)
 - YOLOV3MVHead 
 
 #### Config files
