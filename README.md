@@ -39,7 +39,12 @@ python MVViT/tools/wildtrack2mvcoco --anns-dir /path/to/wildtrack/dataset/annota
 Training and testing is done as usual in the MMDetection framework. New fields are added in the config files for multi-view 
 YOLOv3 and Deformable DETR detectors, which are described next. 
 
+To integrate MVViT to YOLOv3, the following classes were added:
+- [MVViTDarknet](models/backbones/mvvit_darknet.py#10)
+- YOLOV3MVHead 
+
 #### Config files
+
 #### Training
 #### Testing
 
