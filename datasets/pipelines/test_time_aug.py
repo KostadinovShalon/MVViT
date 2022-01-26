@@ -6,7 +6,7 @@ from mmdet.datasets.pipelines import MultiScaleFlipAug
 class MVMultiScaleFlipAug(MultiScaleFlipAug):
 
     def __call__(self, results):
-        """Call function to apply test time augment transforms on results.
+        """Call function to apply test time augment transforms on multi-view results.
 
         Args:
             results (dict): Result dict contains the data to transform.

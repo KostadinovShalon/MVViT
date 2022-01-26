@@ -1,6 +1,5 @@
 import mmcv
 import numpy as np
-from numpy import random
 
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import Resize, RandomFlip, Pad, Normalize

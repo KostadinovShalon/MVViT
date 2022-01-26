@@ -1,101 +1,502 @@
 import torch
+from mmcv.cnn import xavier_init
+from torch.nn import Parameter, Linear
+from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
 
 from mmdet.models.utils import Transformer
 from mmdet.models.utils.builder import TRANSFORMER
 
+from torch import nn
+import numpy as np
+import math
+import torch.nn.functional as F
 
-@TRANSFORMER.register_module()
-class MVTransformer(Transformer):
-    """Implements the DETR transformer.
 
-    Following the official DETR implementation, this module copy-paste
-    from torch.nn.Transformer with modifications:
+class MultiViewPositionalEncoding(nn.Module):
 
-        * positional encodings are passed in MultiheadAttention
-        * extra LN at the end of encoder is removed
-        * decoder returns a stack of activations from all decoding layers
+    def __init__(self, d_model):
+        super(MultiViewPositionalEncoding, self).__init__()
 
-    See `paper: End-to-End Object Detection with Transformers
-    <https://arxiv.org/pdf/2005.12872>`_ for details.
+        channels = int(np.ceil(d_model / 6) * 2)
+        self.channels = channels
+
+        self.div_term = torch.exp(torch.arange(0, channels, 2).float() * (-math.log(10000.0) / channels))
+
+    def forward(self, x):
+        # x is B x C x W x H
+        b, v, c, h, w = x.shape
+        position_x = torch.arange(w, dtype=torch.float).unsqueeze(1)  # W x 1
+        position_y = torch.arange(h, dtype=torch.float).unsqueeze(1)  # H x 1
+        position_view = torch.arange(v, dtype=torch.float).unsqueeze(1)  # V x 1
+
+        pe = torch.zeros(v, self.channels * 3, h, w)
+        pe[:, 0:self.channels:2, ...] = torch.sin(position_x * self.div_term).transpose(0, 1).unsqueeze(1).unsqueeze(
+            0).repeat(v, 1, h, 1)
+        pe[:, 1:self.channels:2, ...] = torch.cos(position_x * self.div_term).transpose(0, 1).unsqueeze(1).unsqueeze(
+            0).repeat(v, 1, h, 1)
+        pe[:, self.channels:(2 * self.channels):2, ...] = torch.sin(position_y * self.div_term).transpose(0,
+                                                                                                          1).unsqueeze(
+            2).unsqueeze(
+            0).repeat(v, 1, 1, w)
+        pe[:, (self.channels + 1):(2 * self.channels):2, ...] = torch.cos(position_y * self.div_term).transpose(0,
+                                                                                                                1).unsqueeze(
+            2).unsqueeze(
+            0).repeat(v, 1, 1, w)
+        pe[:, (2 * self.channels)::2, ...] = torch.sin(position_view * self.div_term).unsqueeze(
+            2).unsqueeze(
+            2).repeat(1, 1, h, w)
+        pe[:, (2 * self.channels + 1)::2, ...] = torch.cos(position_view * self.div_term).unsqueeze(
+            2).unsqueeze(
+            2).repeat(1, 1, h, w)
+
+        pe = pe.repeat(b, 1, 1, 1, 1).to(x.device)
+        x = x + pe[:, :, :c, ...]
+        return x
+
+
+class MultiheadAttentionND(nn.Module):
+
+    def __init__(self, embed_dim, num_heads, dropout=0.0, bias=True, add_bias_kv=False, add_zero_attn=False, kdim=None,
+                 vdim=None):
+        super(MultiheadAttentionND, self).__init__()
+        self.embed_dim = embed_dim
+        self.kdim = kdim if kdim is not None else embed_dim
+        self.vdim = vdim if vdim is not None else embed_dim
+        self._qkv_same_embed_dim = self.kdim == embed_dim and self.vdim == embed_dim
+
+        self.num_heads = num_heads
+        self.dropout = dropout
+        self.head_dim = embed_dim // num_heads
+        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
+
+        if self._qkv_same_embed_dim is False:
+            self.q_proj_weight = Parameter(torch.Tensor(embed_dim, embed_dim))
+            self.k_proj_weight = Parameter(torch.Tensor(embed_dim, self.kdim))
+            self.v_proj_weight = Parameter(torch.Tensor(embed_dim, self.vdim))
+            self.register_parameter('in_proj_weight', None)
+        else:
+            self.in_proj_weight = Parameter(torch.empty(3 * embed_dim, embed_dim))
+            self.register_parameter('q_proj_weight', None)
+            self.register_parameter('k_proj_weight', None)
+            self.register_parameter('v_proj_weight', None)
+
+        if bias:
+            self.in_proj_bias = Parameter(torch.empty(3 * embed_dim))
+        else:
+            self.register_parameter('in_proj_bias', None)
+        self.out_proj = Linear(embed_dim, embed_dim, bias=bias)
+
+        if add_bias_kv:
+            self.bias_k = Parameter(torch.empty(1, 1, embed_dim))
+            self.bias_v = Parameter(torch.empty(1, 1, embed_dim))
+        else:
+            self.bias_k = self.bias_v = None
+
+        self.add_zero_attn = add_zero_attn
+
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+        if self._qkv_same_embed_dim:
+            xavier_uniform_(self.in_proj_weight)
+        else:
+            xavier_uniform_(self.q_proj_weight)
+            xavier_uniform_(self.k_proj_weight)
+            xavier_uniform_(self.v_proj_weight)
+
+        if self.in_proj_bias is not None:
+            constant_(self.in_proj_bias, 0.)
+            constant_(self.out_proj.bias, 0.)
+        if self.bias_k is not None:
+            xavier_normal_(self.bias_k)
+        if self.bias_v is not None:
+            xavier_normal_(self.bias_v)
+
+    def __setstate__(self, state):
+        # Support loading old MultiheadAttention checkpoints generated by v1.1.0
+        if '_qkv_same_embed_dim' not in state:
+            state['_qkv_same_embed_dim'] = True
+
+        super(MultiheadAttentionND, self).__setstate__(state)
+
+    def forward(self, query, key, value, key_padding_mask=None,
+                need_weights=True, attn_mask=None):
+        r"""
+    Args:
+        query, key, value: map a query and a set of key-value pairs to an output.
+            See "Attention Is All You Need" for more details.
+        need_weights: output attn_output_weights.
+        key_padding_mask: TODO not implemented.
+        attn_mask: TODO not implemented
+
+    Shapes for inputs:
+        - query: :math:`(N, *, E)` where B is the batch size, * is any number of additional dimensions, E is
+          the embedding dimension.
+        - key: :math:`(N, *, E)`, where B is the batch size, * is any number of additional dimensions, E is
+          the embedding dimension.
+        - value: :math:`(N, *, E)` where B is the batch size, * is any number of additional dimensions, E is
+          the embedding dimension.
+
+    Shapes for outputs:
+        - attn_output: :math:`(N, *, E)` where B is the batch size, * is any number of additional dimensions, E is
+          the embedding dimension.
+        - attn_output_weights: :math:`(N, *q, *kv)` where B is the batch size, *q is any number of additional dimensions
+          of the query and *kv are the additional dimensions of the key-value pairs
+        """
+
+        bsz, embed_dim = query.size(0), query.size(-1)
+        assert embed_dim == self.embed_dim, f"Embed dim: {embed_dim}, self.embed_dim: {self.embed_dim}"
+        # allow MHA to have different sizes for the feature dimension
+        q_extra_dims = query.shape[1:-1]
+        k_extra_dims = key.shape[1:-1]
+        assert key.shape[1:-1] == value.shape[1:-1]
+
+        scaling = float(self.head_dim) ** -0.5
+
+        if self._qkv_same_embed_dim:
+            if torch.equal(query, key) and torch.equal(key, value):
+                # self-attention
+                q, k, v = F.linear(query, self.in_proj_weight, self.in_proj_bias).chunk(3, dim=-1)
+
+            elif torch.equal(key, value):
+                # encoder-decoder attention
+                # This is inline in_proj function with in_proj_weight and in_proj_bias
+                _b = self.in_proj_bias
+                _start = 0
+                _end = embed_dim
+                _w = self.in_proj_weight[_start:_end, :]
+                if _b is not None:
+                    _b = _b[_start:_end]
+                q = F.linear(query, _w, _b)
+
+                if key is None:
+                    assert value is None
+                    k = None
+                    v = None
+                else:
+
+                    # This is inline in_proj function with in_proj_weight and in_proj_bias
+                    _b = self.in_proj_bias
+                    _start = embed_dim
+                    _end = None
+                    _w = self.in_proj_weight[_start:, :]
+                    if _b is not None:
+                        _b = _b[_start:]
+                    k, v = F.linear(key, _w, _b).chunk(2, dim=-1)
+
+            else:
+                # This is inline in_proj function with in_proj_weight and in_proj_bias
+                _b = self.in_proj_bias
+                _start = 0
+                _end = embed_dim
+                _w = self.in_proj_weight[_start:_end, :]
+                if _b is not None:
+                    _b = _b[_start:_end]
+                q = self.linear(query, _w, _b)
+
+                # This is inline in_proj function with in_proj_weight and in_proj_bias
+                _b = self.in_proj_bias
+                _start = embed_dim
+                _end = embed_dim * 2
+                _w = self.in_proj_weight[_start:_end, :]
+                if _b is not None:
+                    _b = _b[_start:_end]
+                k = self.linear(key, _w, _b)
+
+                # This is inline in_proj function with in_proj_weight and in_proj_bias
+                _b = self.in_proj_bias
+                _start = embed_dim * 2
+                _end = None
+                _w = self.in_proj_weight[_start:, :]
+                if _b is not None:
+                    _b = _b[_start:]
+                v = F.linear(value, _w, _b)
+        else:
+            q_proj_weight_non_opt = torch.jit._unwrap_optional(self.q_proj_weight)
+            len1, len2 = q_proj_weight_non_opt.size()
+            assert len1 == embed_dim and len2 == query.size(-1)
+
+            k_proj_weight_non_opt = torch.jit._unwrap_optional(self.k_proj_weight)
+            len1, len2 = k_proj_weight_non_opt.size()
+            assert len1 == embed_dim and len2 == key.size(-1)
+
+            v_proj_weight_non_opt = torch.jit._unwrap_optional(self.v_proj_weight)
+            len1, len2 = v_proj_weight_non_opt.size()
+            assert len1 == embed_dim and len2 == value.size(-1)
+
+            if self.in_proj_bias is not None:
+                q = F.linear(query, q_proj_weight_non_opt, self.in_proj_bias[0:embed_dim])
+                k = F.linear(key, k_proj_weight_non_opt, self.in_proj_bias[embed_dim:(embed_dim * 2)])
+                v = F.linear(value, v_proj_weight_non_opt, self.in_proj_bias[(embed_dim * 2):])
+            else:
+                q = F.linear(query, q_proj_weight_non_opt, self.in_proj_bias)
+                k = F.linear(key, k_proj_weight_non_opt, self.in_proj_bias)
+                v = F.linear(value, v_proj_weight_non_opt, self.in_proj_bias)
+        q = q * scaling
+
+        if self.bias_k is not None and self.bias_v is not None:
+            k = torch.cat([k, self.bias_k.repeat(bsz, *([1] * (len(k.shape) - 1)))])
+            v = torch.cat([v, self.bias_v.repeat(bsz, *([1] * (len(v.shape) - 1)))])
+        else:
+            assert self.bias_k is None
+            assert self.bias_v is None
+
+        q = q.contiguous().view(bsz, -1, self.embed_dim).transpose(0, 1).contiguous() \
+            .view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)  # B*H, ..., d_h
+        if k is not None:
+            k = k.contiguous().view(bsz, -1, self.embed_dim).transpose(0, 1).contiguous() \
+                .view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+        if v is not None:
+            v = v.contiguous().view(bsz, -1, self.embed_dim).transpose(0, 1).contiguous() \
+                .view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+
+        attn_output_weights = torch.matmul(q, k.transpose(1, 2))
+        assert list(attn_output_weights.size()) == [bsz * self.num_heads, np.prod(q_extra_dims),
+                                                    np.prod(k_extra_dims)]
+
+        attn_output_weights = F.softmax(
+            attn_output_weights, dim=-1)
+        attn_output_weights = F.dropout(attn_output_weights, p=self.dropout, training=self.training)
+
+        attn_output = torch.matmul(attn_output_weights, v)
+        assert list(attn_output.size()) == [bsz * self.num_heads, np.prod(q_extra_dims), self.head_dim]
+        attn_output = attn_output.transpose(0, 1).contiguous().view(-1, bsz, embed_dim) \
+            .transpose(0, 1).view(bsz, *q_extra_dims, embed_dim)
+        attn_output = F.linear(attn_output, self.out_proj.weight, self.out_proj.bias)
+
+        if need_weights:
+            # average attention weights over heads
+            attn_output_weights = attn_output_weights.view(bsz, self.num_heads, *q_extra_dims,
+                                                           *k_extra_dims)
+            return attn_output, attn_output_weights.sum(dim=1) / self.num_heads
+        else:
+            return attn_output, None
+
+
+class MVTransformer(nn.Transformer):
+    r"""A transformer model. User is able to modify the attributes as needed. The architecture
+    is based on the paper "Attention Is All You Need". Ashish Vaswani, Noam Shazeer,
+    Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Lukasz Kaiser, and
+    Illia Polosukhin. 2017. Attention is all you need. In Advances in Neural Information
+    Processing Systems, pages 6000-6010. Users can build the BERT(https://arxiv.org/abs/1810.04805)
+    model with corresponding parameters.
 
     Args:
-        encoder (`mmcv.ConfigDict` | Dict): Config of
-            TransformerEncoder. Defaults to None.
-        decoder ((`mmcv.ConfigDict` | Dict)): Config of
-            TransformerDecoder. Defaults to None
-        init_cfg (obj:`mmcv.ConfigDict`): The Config for initialization.
-            Defaults to None.
-    """
-    def __init__(self, encoder=None, decoder=None, init_cfg=None):
-        super(MVTransformer, self).__init__(encoder, decoder, init_cfg)
-        self.single_view = False
+        d_model: the number of expected features in the encoder/decoder inputs (default=512).
+        nhead: the number of heads in the multiheadattention models (default=8).
+        num_encoder_layers: the number of sub-encoder-layers in the encoder (default=6).
+        num_decoder_layers: the number of sub-decoder-layers in the decoder (default=6).
+        dim_feedforward: the dimension of the feedforward network model (default=2048).
+        dropout: the dropout value (default=0.1).
+        activation: the activation function of encoder/decoder intermediate layer, relu or gelu (default=relu).
+        custom_encoder: custom encoder (default=None).
+        custom_decoder: custom decoder (default=None).
 
-    def forward(self, x, mask, query_embed, pos_embeds):
-        """Forward function for `Transformer`.
+    Examples::
+        >>> transformer_model = nn.Transformer(nhead=16, num_encoder_layers=12)
+        >>> src = torch.rand((10, 32, 512))
+        >>> tgt = torch.rand((20, 32, 512))
+        >>> out = transformer_model(src, tgt)
+
+    Note: A full example to apply nn.Transformer module for the word language model is available in
+    https://github.com/pytorch/examples/tree/master/word_language_model
+    """
+
+    def __init__(self, d_model: int = 512, nhead: int = 8, num_decoder_layers: int = 6, dim_feedforward: int = 2048,
+                 dropout: float = 0.1,
+                 activation: str = "relu",
+                 n_views=2,
+                 mode='add') -> None:
+        decoder_layer = MVTransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout, activation,
+                                                  other_views=n_views - 1, mode=mode)
+        decoder_norm = nn.LayerNorm(d_model)
+        decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm)
+
+        self.mode = mode
+        super(MVTransformer, self).__init__(d_model, nhead, num_decoder_layers, num_decoder_layers, dim_feedforward,
+                                            dropout, activation, custom_decoder=decoder)
+
+    def init_weights(self):
+        # follow the official DETR to init parameters
+        for m in self.modules():
+            if hasattr(m, 'weight') and m.weight.dim() > 1:
+                xavier_init(m, distribution='uniform')
+
+    def forward(self, src, tgt, src_mask=None, tgt_mask=None,
+                memory_mask=None, src_key_padding_mask=None,
+                tgt_key_padding_mask=None, memory_key_padding_mask=None,
+                need_attn_weights=False):
+        r"""Take in and process masked source/target sequences.
 
         Args:
-            x (Tensor): Input query with shape [bs, v, c, h, w] where
-                c = embed_dims.
-            mask (Tensor): The key_padding_mask used for encoder and decoder,
-                with shape [bs, v, h, w].
-            query_embed (Tensor): The query embedding for decoder, with shape
-                [num_query, c].
-            pos_embeds tuple(Tensor): The positional encoding for the encoder and decoder with the same shape as `x`.
+            src: the sequence to the encoder (required).
+            tgt: the sequence to the decoder (required).
+            src_mask: the additive mask for the src sequence (optional).
+            tgt_mask: the additive mask for the tgt sequence (optional).
+            memory_mask: the additive mask for the encoder output (optional).
+            src_key_padding_mask: the ByteTensor mask for src keys per batch (optional).
+            tgt_key_padding_mask: the ByteTensor mask for tgt keys per batch (optional).
+            memory_key_padding_mask: the ByteTensor mask for memory keys per batch (optional).
 
-        Returns:
-            tuple[Tensor]: results of decoder containing the following tensor.
+        Shape:
+            - src: :math:`(S, N, E)`.
+            - tgt: :math:`(T, N, E)`.
+            - src_mask: :math:`(S, S)`.
+            - tgt_mask: :math:`(T, T)`.
+            - memory_mask: :math:`(T, S)`.
+            - src_key_padding_mask: :math:`(N, S)`.
+            - tgt_key_padding_mask: :math:`(N, T)`.
+            - memory_key_padding_mask: :math:`(N, S)`.
 
-                - out_dec: Output from decoder. If return_intermediate_dec \
-                      is True output has shape [num_dec_layers, bs, views,
-                      num_query, embed_dims], else has shape [1, bs, views, \
-                      num_query, embed_dims].
-                - memory: Output results from encoder, with shape \
-                      [bs, v, embed_dims, h, w].
+            Note: [src/tgt/memory]_mask ensures that position i is allowed to attend the unmasked
+            positions. If a ByteTensor is provided, the non-zero positions are not allowed to attend
+            while the zero positions will be unchanged. If a BoolTensor is provided, positions with ``True``
+            are not allowed to attend while ``False`` values will be unchanged. If a FloatTensor
+            is provided, it will be added to the attention weight.
+            [src/tgt/memory]_key_padding_mask provides specified elements in the key to be ignored by
+            the attention. If a ByteTensor is provided, the non-zero positions will be ignored while the zero
+            positions will be unchanged. If a BoolTensor is provided, the positions with the
+            value of ``True`` will be ignored while the position with the value of ``False`` will be unchanged.
+
+            - output: :math:`(T, N, E)`.
+
+            Note: Due to the multi-head attention architecture in the transformer model,
+            the output sequence length of a transformer is same as the input sequence
+            (i.e. target) length of the decode.
+
+            where S is the source sequence length, T is the target sequence length, N is the
+            batch size, E is the feature number
+
+        Examples:
+            >>> output = transformer_model(src, tgt, src_mask=src_mask, tgt_mask=tgt_mask)
         """
-        bs, v, c, h, w = x.shape
-        # use `view` instead of `flatten` for dynamically exporting to ONNX
-        x = x.view(bs, v, c, -1).permute(1, 3, 0, 2)  # [bs, v, c, h, w] -> [v, h*w, bs, c]
-        encoder_pos_embed, decoder_pos_embed = pos_embeds
-        encoder_pos_embed = encoder_pos_embed.view(bs*v, c, -1).permute(2, 0, 1)  # [h*w, bs*v, c]
-        decoder_pos_embed = decoder_pos_embed.view(bs, v, c, -1).permute(1, 3, 0, 2)  # [v, h*w, bs, c]
-        # query_embed = query_embed.unsqueeze(1).repeat(
-        #     1, bs, 1)  # [num_query, dim] -> [num_query, bs, dim]
-        mask = mask.view(bs, v, -1)  # [bs, v, h, w] -> [bs, v, h*w]
 
-        memory = torch.stack([self.encoder(
-            query=x[_v],
-            key=None,
-            value=None,
-            query_pos=encoder_pos_embed[:, _v::v, :],
-            query_key_padding_mask=mask[:, _v, :]) for _v in range(v)])
+        if src[0].size(0) != tgt.size(0):
+            raise RuntimeError("the batch number of src and tgt must be equal")
 
-        query_embed = query_embed.unsqueeze(1).repeat(
-            1, bs, 1)  # [num_query, dim] -> [v*num_query, bs, dim]
-        target = torch.zeros_like(query_embed)
-        # out_dec: [num_layers, views, num_query, bs, dim]
-        if self.single_view:
-            out_dec = torch.cat([self.decoder(
-                query=target,
-                key=memory[_v],
-                value=memory[_v],
-                key_pos=encoder_pos_embed[:, _v::v, :],
-                query_pos=query_embed,
-                key_padding_mask=mask[:, _v, :]) for _v in range(v)], dim=2)
+        # if src.size(-1) != self.d_model or tgt.size(-1) != self.d_model:
+        #     raise RuntimeError("the feature number of src and tgt must be equal to d_model")
+
+        memory = src
+        if self.mode == 'cat':
+            memory = torch.cat(memory, dim=-1)
+        output, attn_weights = self.decoder(tgt, memory, tgt_mask=tgt_mask, memory_mask=memory_mask,
+                                            tgt_key_padding_mask=tgt_key_padding_mask,
+                                            memory_key_padding_mask=memory_key_padding_mask,
+                                            need_attn_weights=need_attn_weights)
+        return output, attn_weights
+
+
+class TransformerDecoder(nn.TransformerDecoder):
+
+    def forward(self, tgt, memory, tgt_mask=None,
+                memory_mask=None, tgt_key_padding_mask=None,
+                memory_key_padding_mask=None,
+                need_attn_weights=False):
+        r"""Pass the inputs (and mask) through the decoder layer in turn.
+
+        Args:
+            tgt: the sequence to the decoder (required).
+            memory: the sequence from the last layer of the encoder (required).
+            tgt_mask: the mask for the tgt sequence (optional).
+            memory_mask: the mask for the memory sequence (optional).
+            tgt_key_padding_mask: the mask for the tgt keys per batch (optional).
+            memory_key_padding_mask: the mask for the memory keys per batch (optional).
+
+        Shape:
+            see the docs in Transformer class.
+        """
+        output = tgt
+        attn_weights_list = []
+
+        for mod in self.layers:
+            output, attn_weights = mod(output, memory, tgt_mask=tgt_mask,
+                                       memory_mask=memory_mask,
+                                       tgt_key_padding_mask=tgt_key_padding_mask,
+                                       memory_key_padding_mask=memory_key_padding_mask,
+                                       need_attn_weights=need_attn_weights)
+            attn_weights_list.append(attn_weights)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
+        return output, attn_weights_list  # attn_weights_list is a list of "B x H x W x H x W tensors"
+
+
+class MVTransformerDecoderLayer(nn.TransformerDecoderLayer):
+    r"""TransformerDecoderLayer is made up of self-attn, multi-head-attn and feedforward network.
+    This standard decoder layer is based on the paper "Attention Is All You Need".
+    Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
+    Lukasz Kaiser, and Illia Polosukhin. 2017. Attention is all you need. In Advances in
+    Neural Information Processing Systems, pages 6000-6010. Users may modify or implement
+    in a different way during application.
+
+    Args:
+        d_model: the number of expected features in the input (required).
+        nhead: the number of heads in the multiheadattention models (required).
+        dim_feedforward: the dimension of the feedforward network model (default=2048).
+        dropout: the dropout value (default=0.1).
+        activation: the activation function of intermediate layer, relu or gelu (default=relu).
+
+    Examples::
+        >>> decoder_layer = nn.TransformerDecoderLayer(d_model=512, nhead=8)
+        >>> memory = torch.rand(10, 32, 512)
+        >>> tgt = torch.rand(20, 32, 512)
+        >>> out = decoder_layer(tgt, memory)
+    """
+
+    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu", other_views=1, mode='add'):
+        super(MVTransformerDecoderLayer, self).__init__(d_model, nhead, dim_feedforward, dropout, activation)
+        self.self_attn = MultiheadAttentionND(d_model, nhead, dropout=dropout)
+        if mode == 'add':
+            self.multihead_attn = nn.ModuleList()
+            for v in range(other_views):
+                self.multihead_attn.append(MultiheadAttentionND(d_model, nhead, dropout=dropout,
+                                                                kdim=d_model, vdim=d_model))
+        elif mode == 'cat':
+            self.multihead_attn = MultiheadAttentionND(d_model, nhead, dropout=dropout,
+                                                       kdim=d_model * other_views, vdim=d_model * other_views)
         else:
-            appended_memory = memory.view(-1, bs, c)  # [v*h*w, bs, c]
-            appended_decoder_pos_emb = decoder_pos_embed.view(-1, bs, c)  # [v*h*w, bs, c]
-            appended_mask = mask.view(bs, -1)
-            out_dec = self.decoder(
-                query=target,
-                key=appended_memory,
-                value=appended_memory,
-                # key_pos=decoder_pos_embed[v],
-                key_pos=appended_decoder_pos_emb,
-                query_pos=query_embed,
-                key_padding_mask=appended_mask)  # shape [nl, h*w, bs, c]
-            # num_layers = out_dec.shape[0]
-            # out_dec = out_dec.view(num_layers, v, -1, bs, c)
-            # out_dec = out_dec.unsqueeze(1)
-        out_dec = out_dec.permute(0, 2, 1, 3).contiguous()
-        memory = memory.permute(2, 0, 3, 1).reshape(bs, v, c, h, w)
-        return out_dec, memory
+            raise NotImplemented(f"Decoder mode {mode} has not been implemented.")
+        self.mode = mode
+        self.other_views = other_views
+
+    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None,
+                tgt_key_padding_mask=None, memory_key_padding_mask=None,
+                need_attn_weights=False):
+        r"""Pass the inputs (and mask) through the decoder layer.
+
+        Args:
+            tgt: the sequence to the decoder layer (required).
+            memory: the sequence from the last layer of the encoder (required).
+            tgt_mask: the mask for the tgt sequence (optional).
+            memory_mask: the mask for the memory sequence (optional).
+            tgt_key_padding_mask: the mask for the tgt keys per batch (optional).
+            memory_key_padding_mask: the mask for the memory keys per batch (optional).
+
+        Shape:
+            see the docs in Transformer class.
+        """
+        tgt2 = self.self_attn(tgt, tgt, tgt, attn_mask=tgt_mask,
+                              key_padding_mask=tgt_key_padding_mask, need_weights=False)[0]
+        tgt = tgt + self.dropout1(tgt2)
+        tgt = self.norm1(tgt)
+        if self.mode == "add":
+            tgt2, attn_weights = [], []
+            for v in range(self.other_views):
+                _tgt2, _attn_weights = self.multihead_attn[v](tgt, memory[v], memory[v], attn_mask=memory_mask,
+                                                              key_padding_mask=memory_key_padding_mask,
+                                                              need_weights=need_attn_weights)
+                tgt2.append(_tgt2)
+                attn_weights.append(_attn_weights)
+            tgt2 = torch.stack(tgt2).sum(dim=0)
+        else:
+            tgt2, attn_weights = self.multihead_attn(tgt, memory, memory, attn_mask=memory_mask,
+                                                     key_padding_mask=memory_key_padding_mask,
+                                                     need_weights=need_attn_weights)
+        tgt = tgt + self.dropout2(tgt2)
+        tgt = self.norm2(tgt)
+        tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
+        tgt = tgt + self.dropout3(tgt2)
+        tgt = self.norm3(tgt)
+        return tgt, attn_weights

@@ -68,9 +68,9 @@ def draw_attention(ref_view, src_view, attention_weights, out_dir, x_pos=None, y
     #     attention_heads_fused = attention_weights.max(axis=0)[0]
     # elif fusion == "min":
     #     attention_heads_fused = attention_weights.min(axis=0)[0]
-    # attention_weights = attention_weights.clone().cpu()
-    # attention_weights -= attention_weights.min()
-    # attention_weights /= attention_weights.max()
+    attention_weights = attention_weights.clone().cpu()
+    attention_weights -= attention_weights.min()
+    attention_weights /= attention_weights.max()
 
     for yi in tqdm.tqdm(range(attention_weights.size(0))):
         for xi in tqdm.tqdm(range(attention_weights.size(1)), leave=False):
@@ -118,15 +118,15 @@ def draw_attention(ref_view, src_view, attention_weights, out_dir, x_pos=None, y
             #     for xj in range(grid_size[1]):
             #         attn_plot[(yj * gh):(yj + 1) * gh, (xj * gw):(xj + 1) * gw] = attn[yj, xj].item()
             # attn_plot = np.minimum(attn_plot, 1) * 0.80
-            # attn_plot = attn_plot - np.min(attn_plot)
+            attn_plot = attn_plot - np.min(attn_plot)
             attn_plot = attn_plot / np.max(attn_plot)
-            attn_plot = scipy.interpolate.griddata(points, attn_plot, (grid_y, grid_x), method='linear', fill_value=0)
+            attn_plot = scipy.interpolate.griddata(points, attn_plot, (grid_y, grid_x), method='linear', fill_value=0.2)
             attn_plot = np.float32(attn_plot)
             # heatmap = cv2.applyColorMap(np.uint8(255 * attn_plot), cv2.COLORMAP_BONE)
             # heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
             # heatmap = np.float32(heatmap) / 255
             # attn_im = cv2.addWeighted(src_view, 0.5, heatmap, 0.5, 0)
-            attn_im = cv2.cvtColor(attn_plot, cv2.COLOR_GRAY2BGR) * src_view
+            attn_im = cv2.cvtColor(attn_plot + 0.2, cv2.COLOR_GRAY2BGR) * src_view
             attn_im = np.uint8(255 * attn_im)
 
             ax = fig.add_subplot(gs[0, 1])
@@ -239,7 +239,7 @@ def inference_mv_detector(model, v0_path, v1_path, out_path, x_pos=None, y_pos=N
     with torch.no_grad():
         result = model(return_loss=False, rescale=True, **data)
         _, attention = model.backbone.forward(data['img'][0], with_attn_weights=True)
-        # Attention shape: B x V x (V-1) x H x W x H x W
+        # Attention shape: B x V x (V-1) x H x W x H x W or  B x V x H x W x H x W
 
         for v in range(2):
             path_attention_dir = os.path.join(out_path, f"attention{v}")
@@ -260,7 +260,14 @@ def inference_mv_detector(model, v0_path, v1_path, out_path, x_pos=None, y_pos=N
                     continue
                 ref_view = data['img'][0][0, v, ...]
                 src_view = data['img'][0][0, _v, ...]
-                attn = attention[0, v, 0]  # TODO: Change
+                ref_view -= ref_view.min()
+                ref_view /= ref_view.max()
+                src_view -= src_view.min()
+                src_view /= src_view.max()
+                if model.backbone.multiview_decoder_mode == "add":
+                    attn = attention[0, v, 0]  # TODO: Change
+                else:
+                    attn = attention[0, v]
                 draw_attention(ref_view, src_view, attn, path_attention_dir, x_pos=x_pos, y_pos=y_pos)
 
     return result

@@ -4,15 +4,15 @@ from collections import OrderedDict
 
 import mmcv
 import numpy as np
-from torch.utils.data import Dataset
 
 from mmdet.core import eval_map, eval_recalls
+from mmdet.datasets import CustomDataset
 from mmdet.datasets.builder import DATASETS
 from mmdet.datasets.pipelines import Compose
 
 
 @DATASETS.register_module()
-class CustomMVDataset(Dataset):
+class CustomMVDataset(CustomDataset):
     """Custom multi-view dataset for detection.
 
     The annotation format is shown as follows. The `ann` field is optional for
@@ -22,15 +22,15 @@ class CustomMVDataset(Dataset):
 
         [
             {
-                'filename': ['a.jpg', 'b.jpg'],
-                'width': [1280, 1280],
-                'height': [720, 720],
-                'ann': [{
+                'filename': ('a.jpg', 'b.jpg'),
+                'width': (1280, 1280),
+                'height': (720, 720),
+                'ann': ({
                     'bboxes': <np.ndarray> (n, 4) in (x1, y1, x2, y2) order.
                     'labels': <np.ndarray> (n, ),
                     'bboxes_ignore': <np.ndarray> (k, 4), (optional field)
                     'labels_ignore': <np.ndarray> (k, 4) (optional field)
-                }, ...]
+                }, ...)
             },
             ...
         ]
@@ -144,62 +144,17 @@ class CustomMVDataset(Dataset):
 
         return tuple(data_info[idx]['ann']['labels'].astype(np.int).tolist() for data_info in self.data_infos)
 
-    def pre_pipeline(self, results):
-        """Prepare results dict for pipeline."""
-        results['img_prefix'] = self.img_prefix
-        results['seg_prefix'] = self.seg_prefix
-        results['proposal_file'] = self.proposal_file
-        results['bbox_fields'] = []
-        results['mask_fields'] = []
-        results['seg_fields'] = []
-
     def _filter_imgs(self, min_size=32):
         """Filter images too small. Returns a list of lists"""
         if self.filter_empty_gt:
             warnings.warn(
-                'CustomDataset does not support filtering empty gt images.')
+                'MVCustomDataset does not support filtering empty gt images.')
         valid_inds = []
         for data_info in self.data_infos:
             for i, img_info in enumerate(data_info):
                 if min(img_info['width'], img_info['height']) >= min_size:
                     valid_inds.append(i)
         return list(set(valid_inds))
-
-    def _set_group_flag(self):
-        """Set flag according to image aspect ratio.
-
-        Images with aspect ratio greater than 1 will be set as group 1,
-        otherwise group 0.
-        """
-        self.flag = np.zeros(len(self), dtype=np.uint8)
-        for i in range(len(self)):
-            img_info = self.data_infos[0][i]
-            if img_info['width'] / img_info['height'] > 1:
-                self.flag[i] = 1
-
-    def _rand_another(self, idx):
-        """Get another random index from the same group as the given index."""
-        pool = np.where(self.flag[0] == self.flag[0][idx])[0]
-        return np.random.choice(pool)
-
-    def __getitem__(self, idx):
-        """Get training/test data after pipeline.
-
-        Args:
-            idx (int): Index of data.
-
-        Returns:
-            tuple[dict]: Training/test data (with annotation if `test_mode` is set True).
-        """
-
-        if self.test_mode:
-            return self.prepare_test_img(idx)
-        while True:
-            data = self.prepare_train_img(idx)
-            if data is None:
-                idx = self._rand_another(idx)
-                continue
-            return data
 
     def prepare_train_img(self, idx):
         """Get training data and annotations after pipeline.
@@ -215,24 +170,11 @@ class CustomMVDataset(Dataset):
         imgs_info = tuple(data_info[idx] for data_info in self.data_infos)
         anns_info = self.get_anns_info(idx)
         results = dict(img_info=imgs_info, ann_info=anns_info)
-        self.add_fundamental_matrices(results)
 
         if self.proposals is not None:
             results['proposals'] = self.proposals[idx]
         self.pre_pipeline(results)
         return self.pipeline(results)
-
-    def add_fundamental_matrices(self, results):
-        if self.fundamental_matrices is not None:
-            results['fundamental_matrices'] = []
-            for v in range(len(self.data_infos)):
-                f = {}
-                for _v in range(len(self.data_infos)):
-                    if v == _v:
-                        continue
-                    f[_v] = np.array(self.fundamental_matrices[(v, _v)]) if v < _v else np.array(
-                        self.fundamental_matrices[(_v, v)]).transpose()
-                results['fundamental_matrices'].append(f)
 
     def prepare_test_img(self, idx):
         """Get testing data  after pipeline.
@@ -251,37 +193,6 @@ class CustomMVDataset(Dataset):
             results['proposals'] = self.proposals[idx]
         self.pre_pipeline(results)
         return self.pipeline(results)
-
-    @classmethod
-    def get_classes(cls, classes=None):
-        """Get class names of current dataset.
-
-        Args:
-            classes (Sequence[str] | str | None): If classes is None, use
-                default CLASSES defined by builtin dataset. If classes is a
-                string, take it as a file name. The file contains the name of
-                classes where each line contains one class name. If classes is
-                a tuple or list, override the CLASSES defined by the dataset.
-
-        Returns:
-            tuple[str] or list[str]: Names of categories of the dataset.
-        """
-        if classes is None:
-            return cls.CLASSES
-
-        if isinstance(classes, str):
-            # take it as a file path
-            class_names = mmcv.list_from_file(classes)
-        elif isinstance(classes, (tuple, list)):
-            class_names = classes
-        else:
-            raise ValueError(f'Unsupported type {type(classes)} of classes.')
-
-        return class_names
-
-    def format_results(self, results, **kwargs):
-        """Place holder to format result to dataset specific output."""
-        pass
 
     def evaluate(self,
                  results,

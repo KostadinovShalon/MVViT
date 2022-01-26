@@ -85,6 +85,7 @@ def parse_args():
         default='none',
         help='job launcher')
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--adjust', action='store_true')
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -103,7 +104,8 @@ def single_gpu_test(model,
                     data_loader,
                     show=False,
                     out_dir=None,
-                    show_score_thr=0.3):
+                    show_score_thr=0.3,
+                    adjust=False):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -126,19 +128,32 @@ def single_gpu_test(model,
             for v in range(dataset.views):
                 for i, (img, img_meta) in enumerate(zip(imgs[v], img_metas)):
                     h, w, _ = img_meta['img_shape'][v]
-                    img_show = img[:h, :w, :]
-
                     ori_h, ori_w = img_meta['ori_shape'][v][:-1]
-                    img_show = mmcv.imresize(img_show, (ori_w, ori_h))
+
+                    if h == w and ori_h != ori_w:  # it was square padded:
+                        max_side = max(ori_w, ori_h)
+                        img_show = mmcv.imresize(img, (max_side, max_side))
+                        img_show = img_show[:ori_h, :ori_w, :]
+                    else:
+                        img_show = img[:h, :w, :]
+                        img_show = mmcv.imresize(img_show, (ori_w, ori_h))
 
                     if out_dir:
                         out_file = osp.join(out_dir, img_meta['ori_filename'][v])
                     else:
                         out_file = None
-
+                    sv_res = result[i * dataset.views + v]
+                    if adjust:
+                        for k in range(len(sv_res)):
+                            w = sv_res[k][:, 2] - sv_res[k][:, 0]
+                            h = sv_res[k][:, 3] - sv_res[k][:, 1]
+                            sv_res[k][:, 0] = sv_res[k][:, 0] - w / 2
+                            sv_res[k][:, 1] = sv_res[k][:, 1] - h / 2
+                            sv_res[k][:, 2] = sv_res[k][:, 2] - w / 2
+                            sv_res[k][:, 3] = sv_res[k][:, 3] - h / 2
                     model.module.show_result(
                         img_show,
-                        result[i * dataset.views + v],
+                        sv_res,
                         show=show,
                         out_file=out_file,
                         score_thr=show_score_thr)
@@ -243,7 +258,7 @@ def main():
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
         outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
-                                  args.show_score_thr)
+                                  args.show_score_thr, adjust=args.adjust)
     else:
         raise Exception("Parallel not supported")
 

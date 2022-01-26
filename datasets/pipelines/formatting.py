@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 import numpy as np
 from mmcv.parallel import DataContainer as DC
 
@@ -9,8 +7,8 @@ import torch
 
 
 @PIPELINES.register_module()
-class MVFormatBundle(object):
-    """Default formatting bundle.
+class MVFormatBundle:
+    """Default formatting bundle for multi-view datasets.
 
     It simplifies the pipeline of formatting common fields, including "img",
     "proposals", "gt_bboxes", "gt_labels", "gt_masks" and "gt_semantic_seg".
@@ -89,7 +87,7 @@ class MVFormatBundle(object):
 class MVImageToTensor(ImageToTensor):
 
     def __call__(self, results):
-        """Call function to convert image in results to :obj:`torch.Tensor` and
+        """Call function to convert image tuples from multi-view datasets in results to :obj:`torch.Tensor` and
         transpose the channel order.
 
         Args:
