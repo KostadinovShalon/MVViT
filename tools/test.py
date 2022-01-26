@@ -85,7 +85,6 @@ def parse_args():
         default='none',
         help='job launcher')
     parser.add_argument('--local_rank', type=int, default=0)
-    parser.add_argument('--adjust', action='store_true')
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -104,8 +103,7 @@ def single_gpu_test(model,
                     data_loader,
                     show=False,
                     out_dir=None,
-                    show_score_thr=0.3,
-                    adjust=False):
+                    show_score_thr=0.3):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -143,14 +141,6 @@ def single_gpu_test(model,
                     else:
                         out_file = None
                     sv_res = result[i * dataset.views + v]
-                    if adjust:
-                        for k in range(len(sv_res)):
-                            w = sv_res[k][:, 2] - sv_res[k][:, 0]
-                            h = sv_res[k][:, 3] - sv_res[k][:, 1]
-                            sv_res[k][:, 0] = sv_res[k][:, 0] - w / 2
-                            sv_res[k][:, 1] = sv_res[k][:, 1] - h / 2
-                            sv_res[k][:, 2] = sv_res[k][:, 2] - w / 2
-                            sv_res[k][:, 3] = sv_res[k][:, 3] - h / 2
                     model.module.show_result(
                         img_show,
                         sv_res,
@@ -258,7 +248,7 @@ def main():
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
         outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
-                                  args.show_score_thr, adjust=args.adjust)
+                                  args.show_score_thr)
     else:
         raise Exception("Parallel not supported")
 

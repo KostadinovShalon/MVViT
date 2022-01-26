@@ -7,12 +7,9 @@ from mmcv import Config
 
 from mmdet.datasets.builder import build_dataset
 
-import numpy as np
-import cv2
-
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Browse a dataset')
+    parser = argparse.ArgumentParser(description='Browse a multi-view dataset')
     parser.add_argument('config', help='train config file path')
     parser.add_argument(
         '--skip-type',
@@ -60,31 +57,15 @@ def main():
         filenames = [os.path.join(args.output_dir, Path(filename).name) if args.output_dir is not None else None
                      for filename in item['filename']]
         for v in range(views):
-            im = mmcv.imshow_det_bboxes(item['img'][v],
-                                        item['gt_bboxes'][v],
-                                        item['gt_labels'][v],
-                                        class_names=dataset.CLASSES,
-                                        show=not args.not_show,
-                                        wait_time=args.show_interval,
-                                        out_file=filenames[v],
-                                        bbox_color=(255, 102, 61),
-                                        text_color=(255, 102, 61))
-            # if "fundamental_matrices" in item:
-            #     h, w, _ = im.shape
-            #     fundamental_matrices = item['fundamental_matrices'][v]
-            #     for _v in range(views):
-            #         if _v == v:
-            #             continue
-            #         f = fundamental_matrices[_v]
-            #         v_gt_bboxes = item['gt_bboxes'][_v]
-            #         v_gt_bboxes = [[(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2, 1] for bbox in v_gt_bboxes]
-            #         epilines = [f @ np.array(b).transpose() for b in v_gt_bboxes]
-            #         for epiline in epilines:
-            #             cv2.line(im, (int(w/2), int(-(epiline[2] + epiline[0] * w / 2) / epiline[1])),
-            #                      (w, int(-(epiline[2] + epiline[0] * w) / epiline[1])),
-            #                      view_colours[_v])
-            # cv2.imwrite(filenames[v], im)
-
+            mmcv.imshow_det_bboxes(item['img'][v],
+                                   item['gt_bboxes'][v],
+                                   item['gt_labels'][v],
+                                   class_names=dataset.CLASSES,
+                                   show=not args.not_show,
+                                   wait_time=args.show_interval,
+                                   out_file=filenames[v],
+                                   bbox_color=(255, 102, 61),
+                                   text_color=(255, 102, 61))
         progress_bar.update()
 
 

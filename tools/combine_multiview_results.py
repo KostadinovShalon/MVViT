@@ -1,30 +1,21 @@
+import argparse
 import itertools
 import json
 import os
 
 import mmcv
+import numpy as np
 import torch
-import tqdm
 from mmcv import Config, print_log
-from mmcv.ops import RoIPool
-from mmcv.parallel import MMDataParallel, collate, scatter
+from mmcv.parallel import MMDataParallel
 from mmcv.runner import load_checkpoint
 from mmcv.utils import logging
-from scipy.interpolate import griddata
 from terminaltables import AsciiTable
 
-from MVViT.tools.test import single_gpu_test
-from mmdet.apis import init_detector
 from mmdet.datasets import replace_ImageToTensor
 from mmdet.datasets.api_wrappers import COCO, COCOeval
 from mmdet.datasets.builder import build_dataset, build_dataloader
-from mmdet.datasets.pipelines import Compose
 from mmdet.models import build_detector
-import argparse
-import cv2
-import numpy as np
-from matplotlib import pyplot as plt, gridspec
-import scipy
 
 
 def parse_args():
