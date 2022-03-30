@@ -7,23 +7,12 @@ from collections import OrderedDict
 import mmcv
 import numpy as np
 from mmcv.utils import print_log
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
+from mmdet.datasets.api_wrappers import COCO, COCOeval
 from terminaltables import AsciiTable
 
 from mmdet.core import eval_recalls
 from mmdet.datasets.builder import DATASETS
 from .custom_mv import CustomMVDataset
-
-try:
-    import pycocotools
-    if not hasattr(pycocotools, '__sphinx_mock__'):  # for doc generation
-        assert pycocotools.__version__ >= '12.0.2'
-except AssertionError:
-    raise AssertionError('Incompatible version of pycocotools is installed. '
-                         'Run pip uninstall pycocotools first. Then run pip '
-                         'install mmpycocotools to install open-mmlab forked '
-                         'pycocotools.')
 
 
 @DATASETS.register_module()
@@ -44,29 +33,56 @@ class MVCocoDataset(CustomMVDataset):
                'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
                'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
 
-    def load_annotations(self, ann_files):
+    PALETTE = [(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230),
+               (106, 0, 228), (0, 60, 100), (0, 80, 100), (0, 0, 70),
+               (0, 0, 192), (250, 170, 30), (100, 170, 30), (220, 220, 0),
+               (175, 116, 175), (250, 0, 30), (165, 42, 42), (255, 77, 255),
+               (0, 226, 252), (182, 182, 255), (0, 82, 0), (120, 166, 157),
+               (110, 76, 0), (174, 57, 255), (199, 100, 0), (72, 0, 118),
+               (255, 179, 240), (0, 125, 92), (209, 0, 151), (188, 208, 182),
+               (0, 220, 176), (255, 99, 164), (92, 0, 73), (133, 129, 255),
+               (78, 180, 255), (0, 228, 0), (174, 255, 243), (45, 89, 255),
+               (134, 134, 103), (145, 148, 174), (255, 208, 186),
+               (197, 226, 255), (171, 134, 1), (109, 63, 54), (207, 138, 255),
+               (151, 0, 95), (9, 80, 61), (84, 105, 51), (74, 65, 105),
+               (166, 196, 102), (208, 195, 210), (255, 109, 65), (0, 143, 149),
+               (179, 0, 194), (209, 99, 106), (5, 121, 0), (227, 255, 205),
+               (147, 186, 208), (153, 69, 1), (3, 95, 161), (163, 255, 0),
+               (119, 0, 170), (0, 182, 199), (0, 165, 120), (183, 130, 88),
+               (95, 32, 0), (130, 114, 135), (110, 129, 133), (166, 74, 118),
+               (219, 142, 185), (79, 210, 114), (178, 90, 62), (65, 70, 15),
+               (127, 167, 115), (59, 105, 106), (142, 108, 45), (196, 172, 0),
+               (95, 54, 80), (128, 76, 255), (201, 57, 1), (246, 0, 122),
+               (191, 162, 208)]
+
+    def load_annotations(self, ann_file):
         """Load annotation from COCO style annotation file.
 
         Args:
-            ann_files (str): Path of annotation file.
+            ann_file (str): Path of annotation file.
 
         Returns:
             list[dict]: Annotation info from COCO api.
         """
-        data_infos_mv = []
-        self.cocos = []
-        for ann_file in ann_files:
-            self.cocos.append(COCO(ann_file))
-            self.cat_ids = self.cocos[-1].get_cat_ids(cat_names=self.CLASSES)
-            self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
-            self.img_ids = self.cocos[-1].get_img_ids()
-            data_infos = []
-            for i in self.img_ids:
-                info = self.cocos[-1].load_imgs([i])[0]
-                info['filename'] = info['file_name']
-                data_infos.append(info)
-            data_infos_mv.append(data_infos)
-        return tuple(data_infos_mv)
+
+        self.coco = COCO(ann_file)
+        # The order of returned `cat_ids` will not
+        # change with the order of the CLASSES
+        self.cat_ids = self.coco.get_cat_ids(cat_names=self.CLASSES)
+
+        self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
+        self.img_ids = self.coco.get_img_ids()
+        data_infos = []
+        total_ann_ids = []
+        for i in self.img_ids:
+            info = self.coco.load_imgs([i])[0]
+            info['filename'] = info['file_name']
+            data_infos.append(info)
+            ann_ids = self.coco.get_ann_ids(img_ids=[i])
+            total_ann_ids.extend(ann_ids)
+        assert len(set(total_ann_ids)) == len(
+            total_ann_ids), f"Annotation ids in '{ann_file}' are not unique!"
+        return data_infos
 
     def get_anns_info(self, idx):
         """Get COCO annotation by index.

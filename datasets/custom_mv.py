@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 import mmcv
 import numpy as np
+from mmcv import print_log
 
 from mmdet.core import eval_map, eval_recalls
 from mmdet.datasets import CustomDataset
@@ -54,24 +55,24 @@ class CustomMVDataset(CustomDataset):
     def __init__(self,
                  ann_files,
                  pipeline,
-                 fundamental_matrices=None,
                  classes=None,
                  data_root=None,
                  img_prefix='',
                  seg_prefix=None,
-                 proposal_file=None,
+                 proposal_files=None,
                  test_mode=False,
-                 filter_empty_gt=True):
+                 filter_empty_gt=True,
+                 file_client_args=dict(backend='disk')):
         self.ann_files = ann_files  # list
         self.data_root = data_root
         self.img_prefix = img_prefix
         self.seg_prefix = seg_prefix
-        self.proposal_file = proposal_file  # list
+        self.proposal_files = proposal_files  # list
         self.test_mode = test_mode
         self.filter_empty_gt = filter_empty_gt
+        self.file_client = mmcv.FileClient(**file_client_args)
         self.CLASSES = self.get_classes(classes)
         self.views = len(self.ann_files)
-        self.fundamental_matrices = fundamental_matrices
 
         # join paths if data_root is specified
         if self.data_root is not None:
@@ -86,13 +87,38 @@ class CustomMVDataset(CustomDataset):
                     osp.join(self.data_root, proposal_file) if not osp.isabs(proposal_file) else proposal_file
                     for proposal_file in self.proposal_file)
         # load annotations (and proposals)
-        self.data_infos = self.load_annotations(self.ann_files)  # Tuple of data infos
+        if hasattr(self.file_client, 'get_local_path'):
+            self.data_infos = []
+            for ann_file in self.ann_files:
+                with self.file_client.get_local_path(ann_file) as local_path:
+                    self.data_infos.append(self.load_annotations(local_path))
+            self.data_infos = tuple(self.data_infos)
+        else:
+            warnings.warn(
+                'The used MMCV version does not have get_local_path. '
+                f'We treat the {self.ann_files} as local paths and it '
+                'might cause errors if the path is not a local path. '
+                'Please use MMCV>= 1.3.16 if you meet errors.')
+            self.data_infos = tuple(self.load_annotations(ann_file) for ann_file in self.ann_files)  # Tuple of data infos
         size = len(self.data_infos[0])
         for i in range(1, self.views):
             assert len(self.data_infos[i]) == size
 
-        if self.proposal_file is not None:
-            self.proposals = self.load_proposals(self.proposal_file)  # list
+        if self.proposal_files is not None:
+            if hasattr(self.file_client, 'get_local_path'):
+                self.proposals = []
+                for proposal_file in self.proposal_files:
+                    with self.file_client.get_local_path(proposal_file) as local_path:
+                        self.proposals.append(self.load_proposals(local_path))
+                self.proposals = tuple(self.proposals)
+            else:
+                warnings.warn(
+                    'The used MMCV version does not have get_local_path. '
+                    f'We treat the {self.proposal_files} as local paths and it '
+                    'might cause errors if the path is not a local path. '
+                    'Please use MMCV>= 1.3.16 if you meet errors.')
+                self.proposals = tuple(
+                    self.load_proposals(proposal_file) for proposal_file in self.proposal_files)  # Tuple of data infos
         else:
             self.proposals = None
 
@@ -112,14 +138,6 @@ class CustomMVDataset(CustomDataset):
         """Total number of samples of data."""
         return len(self.data_infos[0])
 
-    def load_annotations(self, ann_files):
-        """Load annotation from annotations files."""
-        return tuple(mmcv.load(ann_file) for ann_file in ann_files)
-
-    def load_proposals(self, proposal_files):
-        """Load proposal from proposal file."""
-        return tuple(mmcv.load(proposal_file) for proposal_file in proposal_files)
-
     def get_anns_info(self, idx):
         """Get annotation by index.
 
@@ -127,7 +145,7 @@ class CustomMVDataset(CustomDataset):
             idx (int): Index of data.
 
         Returns:
-            tuple[dict]: A list of dicts wit annotation info of specified index on each view.
+            tuple[dict]: A tuple of dicts wit annotation info of specified index on each view.
         """
 
         return tuple(data_info[idx]['ann'] for data_info in self.data_infos)
@@ -155,6 +173,24 @@ class CustomMVDataset(CustomDataset):
                 if min(img_info['width'], img_info['height']) >= min_size:
                     valid_inds.append(i)
         return list(set(valid_inds))
+
+    def _set_group_flag(self):
+        """Set flag according to image aspect ratio.
+
+        Images with aspect ratio greater than 1 will be set as group 1,
+        otherwise group 0.
+        """
+        self.flag = np.zeros((len(self), self.views), dtype=np.uint8)
+        for i in range(len(self)):
+            for j in range(self.views):
+                img_info = self.data_infos[i][j]
+                if img_info['width'] / img_info['height'] > 1:
+                    self.flag[i] = 1
+
+    def _rand_another(self, idx, view=0):
+        """Get another random index from the same group as the given index."""
+        pool = np.where(self.flag[:, view] == self.flag[idx, view])[0]
+        return np.random.choice(pool)
 
     def prepare_train_img(self, idx):
         """Get training data and annotations after pipeline.
@@ -226,22 +262,26 @@ class CustomMVDataset(CustomDataset):
             raise KeyError(f'metric {metric} is not supported')
         annotations = [self.get_ann_info(i) for i in range(len(self))]
         eval_results = OrderedDict()
+        iou_thrs = [iou_thr] if isinstance(iou_thr, float) else iou_thr
         if metric == 'mAP':
-            assert isinstance(iou_thr, float)
-            mean_ap, _ = eval_map(
-                results,
-                annotations,
-                scale_ranges=scale_ranges,
-                iou_thr=iou_thr,
-                dataset=self.CLASSES,
-                logger=logger)
-            eval_results['mAP'] = mean_ap
+            assert isinstance(iou_thr, list)
+            mean_aps = []
+            for iou_thr in iou_thrs:
+                print_log(f'\n{"-" * 15}iou_thr: {iou_thr}{"-" * 15}')
+                mean_ap, _ = eval_map(
+                    results,
+                    annotations,
+                    scale_ranges=scale_ranges,
+                    iou_thr=iou_thr,
+                    dataset=self.CLASSES,
+                    logger=logger)
+                mean_aps.append(mean_ap)
+                eval_results[f'AP{int(iou_thr * 100):02d}'] = round(mean_ap, 3)
+            eval_results['mAP'] = sum(mean_aps) / len(mean_aps)
         elif metric == 'recall':
             gt_bboxes = [ann['bboxes'] for ann in annotations]
-            if isinstance(iou_thr, float):
-                iou_thr = [iou_thr]
             recalls = eval_recalls(
-                gt_bboxes, results, proposal_nums, iou_thr, logger=logger)
+                gt_bboxes, results, proposal_nums, iou_thrs, logger=logger)
             for i, num in enumerate(proposal_nums):
                 for j, iou in enumerate(iou_thr):
                     eval_results[f'recall@{num}@{iou}'] = recalls[i, j]
