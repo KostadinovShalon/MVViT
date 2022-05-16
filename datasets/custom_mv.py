@@ -62,7 +62,8 @@ class CustomMVDataset(CustomDataset):
                  proposal_files=None,
                  test_mode=False,
                  filter_empty_gt=True,
-                 file_client_args=dict(backend='disk')):
+                 file_client_args=dict(backend='disk'),
+                 skip_type_keys=None):
         self.ann_files = ann_files  # list
         self.data_root = data_root
         self.img_prefix = img_prefix
@@ -73,6 +74,13 @@ class CustomMVDataset(CustomDataset):
         self.file_client = mmcv.FileClient(**file_client_args)
         self.CLASSES = self.get_classes(classes)
         self.views = len(self.ann_files)
+
+        if skip_type_keys is not None:
+            assert all([
+                isinstance(skip_type_key, str)
+                for skip_type_key in skip_type_keys
+            ])
+        self._skip_type_keys = skip_type_keys
 
         # join paths if data_root is specified
         if self.data_root is not None:
@@ -134,6 +142,16 @@ class CustomMVDataset(CustomDataset):
         # processing pipeline
         self.pipeline = Compose(pipeline)
 
+
+    def pre_pipeline(self, results):
+        """Prepare results dict for pipeline."""
+        results['img_prefix'] = self.img_prefix
+        results['seg_prefix'] = self.seg_prefix
+        results['proposal_file'] = self.proposal_files
+        results['bbox_fields'] = []
+        results['mask_fields'] = []
+        results['seg_fields'] = []
+
     def __len__(self):
         """Total number of samples of data."""
         return len(self.data_infos[0])
@@ -180,12 +198,11 @@ class CustomMVDataset(CustomDataset):
         Images with aspect ratio greater than 1 will be set as group 1,
         otherwise group 0.
         """
-        self.flag = np.zeros((len(self), self.views), dtype=np.uint8)
+        self.flag = np.zeros(len(self), dtype=np.uint8)
         for i in range(len(self)):
-            for j in range(self.views):
-                img_info = self.data_infos[i][j]
-                if img_info['width'] / img_info['height'] > 1:
-                    self.flag[i] = 1
+            img_info = self.data_infos[0][i]
+            if img_info['width'] / img_info['height'] > 1:
+                self.flag[i] = 1
 
     def _rand_another(self, idx, view=0):
         """Get another random index from the same group as the given index."""
@@ -290,3 +307,15 @@ class CustomMVDataset(CustomDataset):
                 for i, num in enumerate(proposal_nums):
                     eval_results[f'AR@{num}'] = ar[i]
         return eval_results
+
+    def update_skip_type_keys(self, skip_type_keys):
+        """Update skip_type_keys. It is called by an external hook.
+
+        Args:
+            skip_type_keys (list[str], optional): Sequence of type
+                string to be skip pipeline.
+        """
+        assert all([
+            isinstance(skip_type_key, str) for skip_type_key in skip_type_keys
+        ])
+        self._skip_type_keys = skip_type_keys

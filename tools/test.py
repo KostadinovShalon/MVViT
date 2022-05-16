@@ -103,7 +103,8 @@ def single_gpu_test(model,
                     data_loader,
                     show=False,
                     out_dir=None,
-                    show_score_thr=0.3):
+                    show_score_thr=0.3,
+                    to_rgb=False):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -119,7 +120,8 @@ def single_gpu_test(model,
             else:
                 imgs_tensor = data['img'][0].data[0]
             img_metas = data['img_metas'][0].data[0]
-            imgs = [mmcv.tensor2imgs(imgs_tensor[:, i, ...], **img_metas[0]['img_norm_cfg'])
+            mean, std = img_metas[0]['img_norm_cfg'] if 'img_norm_cfg' in img_metas[0] else (None, None)
+            imgs = [mmcv.tensor2imgs(imgs_tensor[:, i, ...], mean, std, to_rgb=to_rgb)
                     for i in range(imgs_tensor.size(1))]
             assert len(imgs) == len(img_metas) * dataset.views
 
@@ -265,7 +267,7 @@ def main():
             # hard-code way to remove EvalHook args
             for key in [
                     'interval', 'tmpdir', 'start', 'gpu_collect', 'save_best',
-                    'rule'
+                    'rule', 'dynamic_intervals'
             ]:
                 eval_kwargs.pop(key, None)
             eval_kwargs.update(dict(metric=args.eval, **kwargs))

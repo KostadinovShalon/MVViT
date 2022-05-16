@@ -30,7 +30,7 @@ train_pipeline = [
     dict(type='LoadMVAnnotations', with_bbox=True),
     dict(type='MVResize', img_scale=size, keep_ratio=True),
     dict(type='MVNormalize', **img_norm_cfg),
-    dict(type='MVPad', size=size, pad_val=(1., 1., 1.)),
+    dict(type='MVPad', size=size, pad_val=dict(img=1)),
     dict(type='MVFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels'], meta_keys=('filename', 'ori_filename', 'ori_shape',
                                                                             'img_shape', 'pad_shape',
@@ -46,7 +46,7 @@ test_pipeline = [
         transforms=[
             dict(type='MVResize', keep_ratio=True),
             dict(type='MVNormalize', **img_norm_cfg),
-            dict(type='MVPad', size=size, pad_val=(1., 1., 1.)),
+            dict(type='MVPad', size=size, pad_val=dict(img=1)),
             dict(type='MVImageToTensor', keys=['img']),
             dict(type='Collect', keys=['img'], meta_keys=('filename', 'ori_filename', 'ori_shape',
                                                           'img_shape', 'pad_shape',
@@ -55,7 +55,7 @@ test_pipeline = [
 ]
 # Modify dataset related settings
 data = dict(
-    samples_per_gpu=4,
+    samples_per_gpu=1,
     workers_per_gpu=4,
     train=dict(
         _delete_=True,

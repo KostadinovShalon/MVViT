@@ -50,7 +50,7 @@ class YOLOV3MVHead(YOLOV3Head):
                 img_metas[i]['scale_factor'][v]
                 for i in range(pred_maps_list[0].shape[0])
             ]
-            proposals = self._get_bboxes(pred_maps_list, scale_factors,
+            proposals = super().get_bboxes(pred_maps_list, scale_factors,
                                          cfg, rescale, with_nms)
             for img_id in range(len(img_metas)):
                 if rescale and 'pad_to_centre' in img_metas[img_id].keys() and img_metas[img_id]['pad_to_centre']:

@@ -100,7 +100,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadMVImagesFromFile', to_float32=True),
     dict(type='LoadMVAnnotations', with_bbox=True),
-    dict(type='MVPad', pad_to_square=True, pad_val=(1., 1., 1.)),
+    dict(type='MVPad', pad_to_square=True, pad_val=dict(img=1)),
     dict(
         type='MVResize',
         img_scale=[(480, 800), (512, 800), (544, 800), (576, 800),
@@ -124,7 +124,7 @@ test_pipeline = [
         img_scale=(800, 800),
         flip=False,
         transforms=[
-            dict(type='MVPad', pad_to_square=True, pad_val=(1., 1., 1.)),
+            dict(type='MVPad', pad_to_square=True, pad_val=dict(img=1)),
             dict(type='MVResize', keep_ratio=True),
             dict(type='MVNormalize', **img_norm_cfg),
             dict(type='MVImageToTensor', keys=['img']),

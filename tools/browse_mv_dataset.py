@@ -63,7 +63,7 @@ def main():
                                    class_names=dataset.CLASSES,
                                    show=not args.not_show,
                                    wait_time=args.show_interval,
-                                   out_file=filenames[v],
+                                   out_file=filenames[v].rsplit('.', 1)[0] + f"_{v}." + filenames[v].rsplit('.', 1)[1],
                                    bbox_color=(255, 102, 61),
                                    text_color=(255, 102, 61))
         progress_bar.update()

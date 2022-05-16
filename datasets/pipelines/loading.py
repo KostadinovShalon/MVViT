@@ -66,6 +66,15 @@ class LoadMVAnnotations(LoadAnnotations):
         ann_info = results['ann_info']
         results['gt_bboxes'] = tuple(sv_ann_info['bboxes'].copy() for sv_ann_info in ann_info)
 
+        # TODO: Implement denorm
+        # if self.denorm_bbox:
+        #     h, w = results['img_shape'][:2]
+        #     bbox_num = results['gt_bboxes'].shape[0]
+        #     if bbox_num != 0:
+        #         results['gt_bboxes'][:, 0::2] *= w
+        #         results['gt_bboxes'][:, 1::2] *= h
+        #     results['gt_bboxes'] = results['gt_bboxes'].astype(np.float32)
+
         # TODO: Implement bbox ignore
         # gt_bboxes_ignore = tuple(sv_ann_info.get('bboxes_ignore', None) for sv_ann_info in ann_info)
         # for i, ignore in enumerate(gt_bboxes_ignore):

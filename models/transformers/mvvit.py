@@ -8,6 +8,7 @@ class MVViT(nn.Module):
 
     def __init__(self, feature_dim, nhead=8, num_decoder_layers=1, positional_encoding=True, views=2):
         super(MVViT, self).__init__()
+        self.views = views
         self.transformer = MVTransformer(feature_dim, nhead, num_decoder_layers, n_views=views)
         self.positional_encoding = MultiViewPositionalEncoding(feature_dim) if positional_encoding else None
 
@@ -24,7 +25,7 @@ class MVViT(nn.Module):
                                            need_attn_weights=with_attn_weights)  # a "n_dec" list of v-1 list of tensors
             outputs.append(output.permute(0, 3, 1, 2))  # B x C x H x W
             if with_attn_weights:
-                attn_weights.append(wts[0])  # B x H x W x H x W
+                attn_weights.append(wts[0][0])  # B x H x W x H x W
 
         outputs = torch.stack(outputs).transpose(0, 1).contiguous()  # B x V x C x W x H
         if with_attn_weights:

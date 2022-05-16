@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument('--combined_results')
     parser.add_argument(
         '--output-dir',
-        default=None,
+        default='results',
         type=str,
         help='If there is no display interface, you can save it')
     args = parser.parse_args()
@@ -195,6 +195,7 @@ def main():
         # Compute per-category AP
         # from https://github.com/facebookresearch/detectron2/
         precisions = cocoEval.eval['precision']
+        recalls = cocoEval.eval['recall']
         # precision: (iou, recall, cls, area range, max dets)
         assert len(cat_ids) == precisions.shape[2]
 
@@ -205,17 +206,62 @@ def main():
             nm = cocoGt.loadCats(catId)[0]
             precision = precisions[:, :, idx, 0, -1]
             precision = precision[precision > -1]
+
+            precision50 = precisions[0, :, idx, 0, -1]
+            precision50 = precision50[precision50 > -1]
+            precision75 = precisions[5, :, idx, 0, -1]
+            precision75 = precision75[precision75 > -1]
+
+            precision_s = precisions[:, :, idx, 1, -1]
+            precision_s = precision_s[precision_s > -1]
+            precision_m = precisions[:, :, idx, 2, -1]
+            precision_m = precision_m[precision_m > -1]
+            precision_l = precisions[:, :, idx, 3, -1]
+            precision_l = precision_l[precision_l > -1]
             if precision.size:
                 ap = np.mean(precision)
+                ap50 = np.mean(precision50)
+                ap75 = np.mean(precision75)
+                aps = np.mean(precision_s)
+                apm = np.mean(precision_m)
+                apl = np.mean(precision_l)
             else:
-                ap = float('nan')
-            results_per_category.append(
-                (f'{nm["name"]}', f'{float(ap):0.3f}'))
+                ap = ap50 = ap75 = aps = apm = apl = float('nan')
 
-        num_columns = min(6, len(results_per_category) * 2)
+            recall = recalls[:, idx, 0, -1]
+            recall = recall[recall > -1]
+
+            recall_s = recalls[:, idx, 1, -1]
+            recall_s = recall_s[recall_s > -1]
+            recall_m = recalls[:, idx, 2, -1]
+            recall_m = recall_m[recall_m > -1]
+            recall_l = recalls[:, idx, 3, -1]
+            recall_l = recall_l[recall_l > -1]
+            if precision.size:
+                ar = np.mean(recall)
+                ars = np.mean(recall_s)
+                arm = np.mean(recall_m)
+                arl = np.mean(recall_l)
+            else:
+                ar = ars = arm = arl = float('nan')
+            results_per_category.append(
+                (f'{nm["name"]}',
+                 f'{float(ap):0.3f}',
+                 f'{float(ap50):0.3f}',
+                 f'{float(ap75):0.3f}',
+                 f'{float(aps):0.3f}',
+                 f'{float(apm):0.3f}',
+                 f'{float(apl):0.3f}',
+                 f'{float(ar):0.3f}',
+                 f'{float(ars):0.3f}',
+                 f'{float(arm):0.3f}',
+                 f'{float(arl):0.3f}'))
+
+        num_columns = 11
         results_flatten = list(
             itertools.chain(*results_per_category))
-        headers = ['category', 'AP'] * (num_columns // 2)
+        headers = ['category', 'AP', 'AP50', 'AP75', 'AP S',
+                   'AP M', 'AP L', 'AR', 'AR S', 'AR M', 'AR L']
         results_2d = itertools.zip_longest(*[
             results_flatten[i::num_columns]
             for i in range(num_columns)

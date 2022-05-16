@@ -56,8 +56,14 @@ def draw_attention(ref_view, src_view, attention_weights, out_dir, x_pos=None, y
     ref_view = ref_view.clone().permute(1, 2, 0).cpu().numpy()
     src_view = src_view.clone().permute(1, 2, 0).cpu().numpy()
 
-    for yi in tqdm.tqdm(range(attention_weights.size(0))):
-        for xi in tqdm.tqdm(range(attention_weights.size(1)), leave=False):
+    ref_view = cv2.cvtColor(ref_view, cv2.COLOR_RGB2BGR)
+    src_view = cv2.cvtColor(src_view, cv2.COLOR_RGB2BGR)
+    # attention_weights = attention_weights.cpu().numpy()
+    # attention_weights = attention_weights - np.min(attention_weights)
+    # attention_weights = attention_weights / np.max(attention_weights)
+
+    for yi in tqdm.tqdm(range(attention_weights.shape[0])):
+        for xi in tqdm.tqdm(range(attention_weights.shape[1]), leave=False):
 
             if x_pos is not None and y_pos is not None:
                 yi = y_pos
@@ -83,19 +89,20 @@ def draw_attention(ref_view, src_view, attention_weights, out_dir, x_pos=None, y
             grid_x, grid_y = np.mgrid[0:w, 0:h]
             points_x, points_y = np.mgrid[(gw//2):w:gw, (gh//2):h:gh]
             points = np.stack((points_y.flatten(), points_x.flatten()), axis=-1)
-            attn_plot = attn.cpu().numpy().flatten()
+            attn_plot = attn.flatten()
 
-            attn_plot = attn_plot - np.min(attn_plot)
-            attn_plot = attn_plot / np.max(attn_plot)
+            # attn_plot = attn_plot - np.min(attn_plot)
+            # attn_plot = attn_plot / np.max(attn_plot)
             attn_plot = scipy.interpolate.griddata(points, attn_plot, (grid_y, grid_x), method='linear', fill_value=0.2)
             attn_plot = np.float32(attn_plot)
-            attn_im = cv2.cvtColor(attn_plot + 0.2, cv2.COLOR_GRAY2BGR) * src_view
-            attn_im = np.uint8(255 * attn_im)
+            # attn_im = cv2.cvtColor(attn_plot + 0.2, cv2.COLOR_GRAY2BGR) * src_view
+            # attn_im = np.uint8(255 * attn_im)
 
             ax = fig.add_subplot(gs[0, 1])
             ax.set_xticks([])
             ax.set_yticks([])
-            ax.imshow(attn_im)
+            ax.imshow(src_view)
+            ax.imshow(attn_plot, cmap='jet', alpha=0.5)
             plt.savefig(os.path.join(out_dir, f"{yi}_{xi}.jpg"), bbox_inches='tight')
             plt.close(fig)
 
@@ -147,7 +154,7 @@ def inference_mv_detector(model, v0_path, v1_path, out_path, x_pos=None, y_pos=N
             model.show_result(
                 img_show,
                 result[v],
-                out_file=out_path,
+                out_file=out_path + ".png",
                 score_thr=0.3)
             for _v in range(2):
                 if v == _v:
@@ -158,10 +165,10 @@ def inference_mv_detector(model, v0_path, v1_path, out_path, x_pos=None, y_pos=N
                 ref_view /= ref_view.max()
                 src_view -= src_view.min()
                 src_view /= src_view.max()
-                if model.backbone.multiview_decoder_mode == "add":
-                    attn = attention[0, v, 0]  # TODO: Change
-                else:
-                    attn = attention[0, v]
+                # if model.backbone.multiview_decoder_mode == "add":
+                #     attn = attention[0, v, 0]  # TODO: Change
+                # else:
+                attn = attention[0, v]
                 draw_attention(ref_view, src_view, attn, path_attention_dir, x_pos=x_pos, y_pos=y_pos)
 
     return result

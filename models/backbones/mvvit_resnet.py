@@ -66,7 +66,7 @@ class MVViTResNet(ResNet):
                           num_decoder_layers=num_decoder_layers,
                           positional_encoding=positional_encoding,
                           views=views))
-                self.view_mvvit[cb] = view_mvvit
+                self.mvvits[cb] = view_mvvit
 
     def forward(self, x, with_attn_weights=False):
         """Forward function."""
@@ -85,8 +85,8 @@ class MVViTResNet(ResNet):
 
         for i, layer_name in enumerate(self.res_layers):
             if (i + 1) in self.combination_blocks:
-                layer_name = self.mvvits[i + 1]
-                mvvit = getattr(self, layer_name)
+                mvvit_layer_name = self.mvvits[i + 1]
+                mvvit = getattr(self, mvvit_layer_name)
                 x, attn = mvvit(x, with_attn_weights)
             res_layer = getattr(self, layer_name)
             x = apply_multiview_layer(x, res_layer)

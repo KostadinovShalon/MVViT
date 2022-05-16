@@ -2,12 +2,12 @@ import numpy as np
 from mmcv.parallel import DataContainer as DC
 
 from mmdet.datasets.builder import PIPELINES
-from mmdet.datasets.pipelines.formating import to_tensor, ImageToTensor
+from mmdet.datasets.pipelines.formating import to_tensor, ImageToTensor, DefaultFormatBundle
 import torch
 
 
 @PIPELINES.register_module()
-class MVFormatBundle:
+class MVFormatBundle(DefaultFormatBundle):
     """Default formatting bundle for multi-view datasets.
 
     It simplifies the pipeline of formatting common fields, including "img",
@@ -37,6 +37,12 @@ class MVFormatBundle:
 
         if 'img' in results:
             imgs = results['img']
+            if self.img_to_float is True and imgs[0].dtype == np.uint8:
+                # Normally, image is of uint8 type without normalization.
+                # At this time, it needs to be forced to be converted to
+                # flot32, otherwise the model training and inference
+                # will be wrong. Only used for YOLOX currently .
+                imgs = tuple(img.astype(np.float32) for img in imgs)
             # add default meta keys
             results = self._add_default_meta_keys(results)
             imgs = tuple(np.expand_dims(img, -1) if len(img.shape) < 3 else img for img in imgs)

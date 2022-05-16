@@ -1,5 +1,5 @@
 _base_ = [
-    '../../configs/_base_/datasets/coco_detection.py', '../../configs/_base_/default_runtime.py'
+    '../../../configs/_base_/datasets/coco_detection.py', '../../../configs/_base_/default_runtime.py'
 ]
 
 custom_imports = dict(imports=['MVViT.models.backbones.mvvit_resnet',
@@ -23,6 +23,7 @@ model = dict(
         norm_cfg=dict(type='BN', requires_grad=False),
         norm_eval=True,
         style='pytorch',
+        views=3,
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     neck=dict(
         type='MVChannelMapper',
@@ -135,28 +136,28 @@ test_pipeline = [
 classes = ('firearm', 'laptop', 'knife', 'camera')
 dataset_type = 'MVCocoDataset'
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=1,
     workers_per_gpu=2,
     train=dict(
         _delete_=True,
         type=dataset_type,
         img_prefix='data/db4/images/',
         classes=classes,
-        ann_files=['data/db4/db4_train_A.json', 'data/db4/db4_train_C.json'],
+        ann_files=['data/db4/db4_train_A.json', 'data/db4/db4_train_C.json', 'data/db4/db4_train_C.json'],
         pipeline=train_pipeline),
     val=dict(
         _delete_=True,
         type=dataset_type,
         img_prefix='data/db4/images/',
         classes=classes,
-        ann_files=['data/db4/db4_test_A.json', 'data/db4/db4_test_C.json'],
+        ann_files=['data/db4/db4_test_A.json', 'data/db4/db4_test_B.json', 'data/db4/db4_test_C.json'],
         pipeline=test_pipeline),
     test=dict(
         _delete_=True,
         type=dataset_type,
         img_prefix='data/db4/images/',
         classes=classes,
-        ann_files=['data/db4/db4_test_A.json', 'data/db4/db4_test_C.json'],
+        ann_files=['data/db4/db4_test_A.json', 'data/db4/db4_test_B.json', 'data/db4/db4_test_C.json'],
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(
