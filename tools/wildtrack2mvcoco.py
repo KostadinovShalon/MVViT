@@ -39,8 +39,8 @@ def create_annotations(root, ann_files):
                 xmax, ymax, xmin, ymin = instance["views"][v]['xmax'], instance["views"][v]['ymax'], instance["views"][v][
                     'xmin'], instance["views"][v]['ymin']
                 if not (xmax == -1 or ymax == -1 or xmin == -1 or ymin == 1):
-                    x = (xmax + xmin) / 2
-                    y = (ymax + ymin) / 2
+                    x = xmin
+                    y = ymin
                     w = xmax - xmin
                     h = ymax - ymin
                     annotations[v].append({
