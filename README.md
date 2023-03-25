@@ -173,3 +173,13 @@ python MVViT/tools/test.py /path/to/config/file /path/to/checkpoint [same option
 |             |                  |              | MVViT      | 0.648     | 0.904      | 0.732       | **0.135**  | **0.674**  | 0.577     | 0.737     | **0.144**  | **0.733** | 0.714     |
 
 ## Citation
+```
+@InProceedings{isaac-medina2022mvvit,
+  author={Isaac-Medina, Brian K. S. and Willcocks, Chris G. and Breckon, Toby P.},
+  booktitle={2022 26th International Conference on Pattern Recognition (ICPR)}, 
+  title={Multi-view Vision Transformers for Object Detection}, 
+  year={2022},
+  pages={4678-4684},
+  doi={10.1109/ICPR56361.2022.9956443}
+  }
+```
